@@ -344,6 +344,15 @@ class FullTestPipeline:
             cmd.extend(["--timeout-run", str(self.config.timeout)])
         if not self.config.fail_fast:
             cmd.append("--no-fail-fast")
+        
+        # Enable reporting if configured
+        if hasattr(self.config, 'enable_reporting') and self.config.enable_reporting:
+            cmd.append("--enable-reporting")
+            if hasattr(self.config, 'report_formats') and self.config.report_formats:
+                cmd.extend(["--report-formats"] + self.config.report_formats)
+            if hasattr(self.config, 'report_dir') and self.config.report_dir:
+                cmd.extend(["--report-dir", str(self.config.report_dir)])
+        
         # Always show real-time output for test runs (don't use --quiet)
         
         try:
@@ -351,7 +360,7 @@ class FullTestPipeline:
             self.logger.info("Running tests on FVP (real-time output):")
             self.logger.info("=" * 60)
             
-            result = subprocess.run(
+            subprocess.run(
                 cmd,
                 check=True,
                 text=True,

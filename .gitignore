@@ -2,7 +2,9 @@
 .devcontainer/
 pytest_cache/
 build*/
-GeneratedTests/
+GeneratedTests/*
+modules/*
+reports/*
 .vscode/
 .DS_Store
 .env

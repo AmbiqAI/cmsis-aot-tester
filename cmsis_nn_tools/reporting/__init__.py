@@ -1,0 +1,22 @@
+"""
+Test reporting module for CMSIS-NN Tools.
+
+This module provides comprehensive test reporting functionality including:
+- Test result data structures
+- Output parsing from Unity test framework
+- Multiple report format generation (JSON, HTML, Markdown)
+- Report storage and retrieval
+"""
+
+from .models import TestResult, TestReport
+from .parser import TestResultParser
+from .generator import ReportGenerator
+from .storage import ReportStorage
+
+__all__ = [
+    "TestResult",
+    "TestReport", 
+    "TestResultParser",
+    "ReportGenerator",
+    "ReportStorage"
+]

@@ -42,6 +42,11 @@ class Config:
     skip_build: bool = False
     skip_run: bool = False
     
+    # Reporting configuration
+    enable_reporting: bool = False
+    report_formats: list = field(default_factory=lambda: ["json"])
+    report_dir: Path = field(default_factory=lambda: Path("reports"))
+    
     def __post_init__(self):
         """Post-initialization processing."""
         # Convert string paths to Path objects if needed

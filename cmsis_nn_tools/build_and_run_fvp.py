@@ -29,8 +29,20 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
+
+# Import reporting modules
+try:
+    from .reporting.models import TestResult, TestStatus
+    from .reporting.parser import TestResultParser
+except ImportError:
+    # Fallback for when running as standalone script
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from reporting.models import TestResult, TestStatus
+    from reporting.parser import TestResultParser
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DL = REPO_ROOT / "downloads"
@@ -191,6 +203,109 @@ def find_elves(build_dir: Path) -> List[Path]:
     return [p for p in build_dir.rglob("*.elf") if p.is_file()]
 
 
+def run_fvp_with_reporting(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: List[str], env: dict, cpu: str) -> TestResult:
+    """
+    Run FVP with comprehensive result reporting.
+    
+    Returns:
+        TestResult object with detailed test information
+    """
+    start_time = time.time()
+    parser = TestResultParser()
+    
+    args = [
+        str(fvp_exe),
+        "-C", "mps3_board.uart0.shutdown_on_eot=1",
+        "-C", "mps3_board.visualisation.disable-visualisation=1",
+        "-C", "mps3_board.telnetterminal0.start_telnet=0",
+        "-C", "mps3_board.uart0.out_file=-",
+        "-C", "mps3_board.uart0.unbuffered_output=1",
+    ] + extra_args + [str(elf)]
+    
+    print(f"Run: {' '.join(args)}")
+    
+    try:
+        proc = subprocess.run(
+            args,
+            cwd=str(REPO_ROOT),
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=None if timeout <= 0 else timeout,
+        )
+        exit_code = proc.returncode
+        output = proc.stdout or ""
+        
+    except subprocess.TimeoutExpired:
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"TIMEOUT running {elf}", file=sys.stderr)
+        
+        # Create timeout result
+        return TestResult(
+            test_name=elf.stem,
+            status=TestStatus.TIMEOUT,
+            duration=duration,
+            cpu=cpu,
+            elf_path=elf,
+            failure_reason="Test execution timed out",
+            timestamp=datetime.now(),
+            exit_code=124,
+            error_type="timeout"
+        )
+    
+    except Exception as e:
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"ERROR running {elf}: {e}", file=sys.stderr)
+        
+        # Create error result
+        return TestResult(
+            test_name=elf.stem,
+            status=TestStatus.ERROR,
+            duration=duration,
+            cpu=cpu,
+            elf_path=elf,
+            failure_reason=f"Execution error: {str(e)}",
+            timestamp=datetime.now(),
+            exit_code=-1,
+            error_type="crash"
+        )
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    # Parse the output to create TestResult
+    result = parser.parse_fvp_output(output, elf, cpu, duration, exit_code)
+    
+    # Display results (maintain existing behavior)
+    if result.status == TestStatus.PASS:
+        if not quiet:
+            sys.stdout.write(output)
+            sys.stdout.flush()
+        print(f"PASS: {elf}")
+    else:
+        # Show failure details even in quiet mode
+        print(f"FAIL: {elf}")
+        print("=" * 60)
+        print("FAILURE DETAILS:")
+        print("=" * 60)
+        
+        if result.failure_reason:
+            print(f"Reason: {result.failure_reason}")
+            print()
+        
+        # Show relevant output lines
+        for line in result.output_lines[:20]:  # Limit output
+            print(line)
+        if len(result.output_lines) > 20:
+            print("... (truncated)")
+        print("=" * 60)
+    
+    return result
+
+
 def run_fvp(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: List[str], env: dict) -> bool:
     args = [
         str(fvp_exe),
@@ -265,6 +380,127 @@ def parse_cpus(cpu_str: str) -> List[str]:
 
 
 
+def run_tests_with_reporting(cpus: List[str], 
+                           source_dir: Path,
+                           toolchain_file: Path,
+                           cmsis5: Path,
+                           fvp_exe: Path,
+                           args) -> Tuple[List[TestResult], bool]:
+    """
+    Run tests with comprehensive reporting.
+    
+    Returns:
+        Tuple of (list of TestResult objects, overall success)
+    """
+    try:
+        from .reporting.storage import ReportStorage
+        from .reporting.generator import ReportGenerator
+        from .reporting.models import TestReport, TestStatus
+    except ImportError:
+        # Fallback for when running as standalone script
+        import sys
+        sys.path.append(str(Path(__file__).parent))
+        from reporting.storage import ReportStorage
+        from reporting.generator import ReportGenerator
+        from reporting.models import TestReport, TestStatus
+    
+    all_results = []
+    any_fail = False
+    start_time = datetime.now()
+    
+    # Initialize reporting
+    storage = ReportStorage()
+    generator = ReportGenerator()
+    
+    for cpu in cpus:
+        print(f"\nTarget: {cpu} (gcc)")
+        build_dir = source_dir / f"build-{cpu}-gcc"
+        
+        if not args.no_build:
+            # Build first
+            env = os.environ.copy()
+            cmake_configure(
+                source_dir=source_dir,
+                build_dir=build_dir,
+                toolchain_file=toolchain_file,
+                cpu=cpu,
+                cmsis5=cmsis5,
+                optimization=args.opt,
+                extra_defs=args.cmake_def,
+                generator=args.generator,
+                quiet=args.quiet,
+                env=env,
+            )
+            cmake_build(build_dir=build_dir, quiet=args.quiet, env=env, jobs=args.jobs)
+        
+        if args.no_run:
+            continue
+        
+        elves = find_elves(build_dir)
+        if not elves:
+            print(f"(no .elf found under {build_dir}, nothing to run)")
+            continue
+        
+        # Run tests for this CPU
+        cpu_results = []
+        for elf in sorted(elves):
+            result = run_fvp_with_reporting(
+                fvp_exe=fvp_exe, 
+                elf=elf, 
+                timeout=args.timeout_run,
+                quiet=args.quiet, 
+                extra_args=args.fvp_arg, 
+                env=os.environ.copy(),
+                cpu=cpu
+            )
+            cpu_results.append(result)
+            all_results.append(result)
+            
+            if result.status != TestStatus.PASS:
+                any_fail = True
+                if args.fail_fast:
+                    print("Stopping early due to failure (--fail-fast).")
+                    break
+        
+        if any_fail and args.fail_fast:
+            break
+    
+    # Generate report
+    end_time = datetime.now()
+    
+    # Count results by status
+    status_counts = {}
+    for status in TestStatus:
+        status_counts[status.value.lower()] = sum(1 for r in all_results if r.status == status)
+    
+    # Create test report
+    report = TestReport(
+        run_id=f"run_{start_time.strftime('%Y%m%d_%H%M%S')}",
+        start_time=start_time,
+        end_time=end_time,
+        cpu=",".join(cpus),
+        total_tests=len(all_results),
+        passed=status_counts.get('pass', 0),
+        failed=status_counts.get('fail', 0),
+        skipped=status_counts.get('skip', 0),
+        timed_out=status_counts.get('timeout', 0),
+        errors=status_counts.get('error', 0),
+        results=all_results
+    )
+    
+    # Save and generate reports
+    report_file = storage.save_report(report)
+    print(f"\nTest report saved to: {report_file}")
+    
+    # Generate additional report formats if requested
+    if hasattr(args, 'report_formats') and args.report_formats:
+        generated_files = generator.generate_reports(report, args.report_formats)
+        for format_type, file_path in generated_files.items():
+            print(f"{format_type.upper()} report generated: {file_path}")
+    
+    return all_results, not any_fail
+
+
 def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="Build and run CMSIS-NN UnitTests on FVP Corstone-300 (Python).")
     ap.add_argument("-c", "--cpu", default="cortex-m55", help="Comma-separated cores, e.g. cortex-m3,cortex-m55")
@@ -287,6 +523,13 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--timeout-run", type=float, default=0.0, help="Per-test timeout in seconds (0 = none)")
     ap.add_argument("--fail-fast", action=argparse.BooleanOptionalAction, default=True, help="Stop on first failure")
     ap.add_argument("--fvp-arg", action="append", default=[], help="Extra args to pass to the FVP (repeatable)")
+    
+    # Reporting options
+    ap.add_argument("--enable-reporting", action="store_true", help="Enable comprehensive test reporting")
+    ap.add_argument("--report-formats", nargs="+", choices=["json", "html", "md"], default=["json"], 
+                   help="Report formats to generate (default: json)")
+    ap.add_argument("--report-dir", type=Path, default=Path("reports"), help="Directory to save reports")
+    
     args = ap.parse_args(argv)
 
     if not is_linux():
@@ -309,6 +552,25 @@ def main(argv: List[str]) -> int:
         die(f"CMake source dir not found: {source_dir}")
 
     cpus = parse_cpus(args.cpu)
+    
+    # Use reporting if enabled
+    if args.enable_reporting:
+        results, success = run_tests_with_reporting(
+            cpus=cpus,
+            source_dir=source_dir,
+            toolchain_file=toolchain_file,
+            cmsis5=cmsis5,
+            fvp_exe=fvp_exe,
+            args=args
+        )
+        
+        if success:
+            print("\nAll requested builds/runs completed successfully.")
+            return 0
+        else:
+            return 1
+    
+    # Original logic for backward compatibility
     any_fail = False
 
     for cpu in cpus:

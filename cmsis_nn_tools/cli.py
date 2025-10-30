@@ -85,6 +85,17 @@ Examples:
     parser.add_argument("--no-fail-fast", action="store_true",
                        help="Don't stop on first test failure")
     
+    # Reporting options
+    parser.add_argument("--enable-reporting", action="store_true",
+                       help="Enable comprehensive test reporting")
+    parser.add_argument("--report-formats", nargs="+", 
+                       choices=["json", "html", "md"], default=["json"],
+                       help="Report formats to generate (default: json)")
+    parser.add_argument("--report-dir", type=Path, default=Path("reports"),
+                       help="Directory to save reports (default: reports)")
+    parser.add_argument("--show-latest-report", action="store_true",
+                       help="Show the latest test report summary")
+    
     # General options
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Show detailed output")
@@ -143,6 +154,45 @@ def main() -> int:
     config.skip_runners = args.skip_runners
     config.skip_build = args.skip_build
     config.skip_run = args.skip_run
+    
+    # Reporting configuration
+    config.enable_reporting = args.enable_reporting
+    config.report_formats = args.report_formats
+    config.report_dir = args.report_dir
+    
+    # Handle show-latest-report
+    if args.show_latest_report:
+        try:
+            from .reporting.storage import ReportStorage
+        except ImportError:
+            # Fallback for when running as standalone script
+            import sys
+            sys.path.append(str(Path(__file__).parent))
+            from reporting.storage import ReportStorage
+        storage = ReportStorage(config.report_dir)
+        latest_report = storage.get_latest_report(config.cpu)
+        
+        if latest_report:
+            print(f"\nLatest Test Report for {config.cpu}")
+            print("=" * 50)
+            print(f"Run ID: {latest_report.run_id}")
+            print(f"Start Time: {latest_report.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"Duration: {latest_report.duration:.2f} seconds")
+            print(f"Summary: {latest_report.summary}")
+            print()
+            
+            # Show failed tests if any
+            failed_tests = latest_report.get_failed_tests()
+            if failed_tests:
+                print("Failed Tests:")
+                for test in failed_tests:
+                    print(f"  - {test.test_name}: {test.failure_reason}")
+                print()
+            
+            return 0
+        else:
+            print(f"No reports found for CPU: {config.cpu}")
+            return 1
     
     # Setup logging
     logger = setup_logger(
