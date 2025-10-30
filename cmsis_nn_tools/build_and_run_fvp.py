@@ -1,0 +1,360 @@
+#!/usr/bin/env python3
+"""
+build_and_run_fvp.py — Python replacement for CMSIS-NN UnitTest build+run on FVP Corstone-300.
+
+Examples:
+  # vanilla (downloads in ./downloads, GCC toolchain from downloads, FVP from downloads)
+  python3 python_scripts/build_and_run_fvp.py
+
+  # multiple CPUs, less optimization, quiet logs
+  python3 python_scripts/build_and_run_fvp.py -c cortex-m3,cortex-m55 -o "-O2" -q
+
+  # skip downloads/setup (assume paths present), override paths, pass extra CMake defs
+  python3 python_scripts/build_and_run_fvp.py -e -u ./downloads/ethos-u-core-platform -C ./downloads/CMSIS_5 \
+    -D CMSIS_NN_USE_REQUANTIZE_INLINE_ASSEMBLY=ON
+
+  # use Arm Compiler, custom generator, increased timeouts
+  python3 python_scripts/build_and_run_fvp.py -a --generator Ninja --timeout-run 180
+
+Notes:
+- This script mirrors flags of ns-cmsis-nn/Tests/UnitTest/build_and_run_tests.sh where sensible.
+- It expects Linux (same as the bash script).
+"""
+
+from __future__ import annotations
+import argparse
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Iterable, List, Optional
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DL = REPO_ROOT / "downloads"
+DEFAULT_SOURCE = REPO_ROOT
+
+FVP_EXE_NAME = "FVP_Corstone_SSE-300_Ethos-U55"
+FVP_DIR_X86 = "Linux64_GCC-9.3"
+FVP_DIR_AARCH64 = "Linux64_armv8l_GCC-9.3"
+
+
+def die(msg: str, code: int = 2):
+    print(f"ERROR: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def is_linux() -> bool:
+    return platform.system().lower() == "linux"
+
+
+def arch_tag() -> str:
+    m = platform.machine().lower()
+    if m in ("x86_64", "amd64"):
+        return "x86_64"
+    if m in ("aarch64", "arm64"):
+        return "aarch64"
+    die(f"Unsupported architecture: {m}")
+
+
+def ensure_exe_on_path(name: str) -> Optional[str]:
+    return shutil.which(name)
+
+
+def call_setup_dependencies(downloads_dir: Path) -> None:
+    # Prefer consolidated location under cmsis_nn_tools/scripts
+    setup_candidates = [
+        REPO_ROOT / "cmsis_nn_tools" / "scripts" / "setup_dependencies.py",
+        REPO_ROOT / "scripts" / "setup_dependencies.py",
+    ]
+    setup = next((p for p in setup_candidates if p.exists()), None)
+    if not setup:
+        # Soft skip if setup script isn't present in consolidated repo
+        print("No setup_dependencies.py found; skipping dependency setup.")
+        return
+    print("Ensuring dependencies via setup_dependencies.py")
+    rc = subprocess.call(
+        [sys.executable, str(setup), "--downloads-dir", str(downloads_dir)],
+        cwd=str(REPO_ROOT),
+    )
+    if rc != 0:
+        die(f"Dependency setup failed (rc={rc})")
+
+
+def prepend_path(p: Path, env: dict) -> None:
+    env["PATH"] = str(p) + os.pathsep + env.get("PATH", "")
+
+
+def detect_paths(args) -> dict:
+    # base
+    env = os.environ.copy()
+    arch = arch_tag()
+
+    # downloads root
+    dl = args.downloads_dir.resolve()
+
+    # ethos-u core platform
+    ethos = Path(args.ethos_path).resolve() if args.ethos_path else (dl / "ethos-u-core-platform")
+    if not ethos.exists():
+        die(f"Ethos-U core platform not found: {ethos}. Run without -e or point -u to a valid path.")
+
+    # cmsis5
+    cmsis5 = Path(args.cmsis5_path).resolve() if args.cmsis5_path else (dl / "CMSIS_5")
+    if not cmsis5.exists():
+        die(f"CMSIS_5 not found: {cmsis5}. Run without -e or point -C to a valid path.")
+
+    # toolchain file & compiler tag
+    if args.use_arm_compiler:
+        toolchain_file = ethos / "cmake" / "toolchain" / "armclang.cmake"
+        compiler_tag = "arm-compiler"
+    else:
+        toolchain_file = ethos / "cmake" / "toolchain" / "arm-none-eabi-gcc.cmake"
+        compiler_tag = "gcc"
+        if not args.no_gcc_from_download:
+            gcc_bin = dl / "arm_gcc_download" / "bin"
+            if not gcc_bin.exists():
+                die(f"GCC toolchain not found at {gcc_bin}. Run without -e or install gcc on PATH.")
+            prepend_path(gcc_bin, env)
+
+    if not toolchain_file.exists():
+        die(f"Toolchain file missing: {toolchain_file}")
+
+    # FVP
+    fvp_dir = dl / "corstone300_download" / "models" / "Linux64_armv8l_GCC-9.3"
+    fvp_exe: Optional[Path] = None
+    if not args.no_fvp_from_download:
+        fvp_exe_candidate = fvp_dir / FVP_EXE_NAME
+        if not fvp_exe_candidate.exists():
+            die(f"FVP not found at {fvp_exe_candidate}. Run with -f to use a system FVP on PATH.")
+        prepend_path(fvp_dir, env)
+        fvp_exe = fvp_exe_candidate
+    else:
+        from_path = ensure_exe_on_path(FVP_EXE_NAME)
+        if not from_path:
+            die(f"{FVP_EXE_NAME} not on PATH (use downloads or add it).")
+        fvp_exe = Path(from_path)
+
+    return {
+        "env": env,
+        "dl": dl,
+        "ethos": ethos,
+        "cmsis5": cmsis5,
+        "toolchain_file": toolchain_file,
+        "compiler_tag": compiler_tag,
+        "fvp_exe": fvp_exe,
+    }
+
+
+def cmake_configure(source_dir: Path, build_dir: Path, toolchain_file: Path, cpu: str,
+                    cmsis5: Path, optimization: str, extra_defs: List[str], generator: Optional[str],
+                    quiet: bool, env: dict) -> None:
+    build_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "cmake",
+        "-S", str(source_dir),
+        "-B", str(build_dir),
+        f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+        f"-DTARGET_CPU={cpu}",
+        f"-DCMSIS_PATH={cmsis5}",
+        f"-DCMSIS_OPTIMIZATION_LEVEL={optimization}",
+    ] + [f"-D{d}" for d in extra_defs]
+    
+    if generator:
+        cmd += ["-G", generator]
+    print(f"Configure: {' '.join(cmd)}")
+    stdout = subprocess.DEVNULL if quiet else None
+    rc = subprocess.call(cmd, cwd=str(REPO_ROOT), env=env, stdout=stdout, stderr=None)
+    if rc != 0:
+        die(f"CMake configure failed for {cpu} (rc={rc})")
+
+
+def cmake_build(build_dir: Path, quiet: bool, env: dict, jobs: Optional[int]) -> None:
+    cmd = ["cmake", "--build", str(build_dir)]
+    if jobs and jobs > 0:
+        # Pass through to the underlying build tool (works for Make/Ninja)
+        cmd += ["--", f"-j{jobs}"]
+    print(f"Build: {' '.join(cmd)}")
+    stdout = subprocess.DEVNULL if quiet else None
+    rc = subprocess.call(cmd, cwd=str(REPO_ROOT), env=env, stdout=stdout, stderr=None)
+    if rc != 0:
+        die(f"CMake build failed (rc={rc})")
+
+
+def find_elves(build_dir: Path) -> List[Path]:
+    # First try to find ELF files in a 'tests' subdirectory
+    tests_dir = build_dir / "tests"
+    if tests_dir.exists():
+        return [p for p in tests_dir.rglob("*.elf") if p.is_file()]
+    # Fallback to searching the entire build directory
+    return [p for p in build_dir.rglob("*.elf") if p.is_file()]
+
+
+def run_fvp(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: List[str], env: dict) -> bool:
+    args = [
+        str(fvp_exe),
+        "-C", "mps3_board.uart0.shutdown_on_eot=1",
+        "-C", "mps3_board.visualisation.disable-visualisation=1",
+        "-C", "mps3_board.telnetterminal0.start_telnet=0",
+        "-C", "mps3_board.uart0.out_file=-",
+        "-C", "mps3_board.uart0.unbuffered_output=1",
+    ] + extra_args + [str(elf)]
+    print(f"Run: {' '.join(args)}")
+    try:
+        proc = subprocess.run(
+            args,
+            cwd=str(REPO_ROOT),
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=None if timeout <= 0 else timeout,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"TIMEOUT running {elf}", file=sys.stderr)
+        return False
+
+    out = proc.stdout or ""
+    success = ("0 Failures" in out)
+    
+    if not success:
+        # Show failure details even in quiet mode
+        print(f"FAIL: {elf}")
+        print("=" * 60)
+        print("FAILURE DETAILS:")
+        print("=" * 60)
+        # Extract relevant failure information
+        lines = out.split('\n')
+        failure_lines = []
+        in_failure_section = False
+        
+        for line in lines:
+            if any(keyword in line.lower() for keyword in ['fail', 'error', 'assert', 'test']):
+                in_failure_section = True
+                failure_lines.append(line)
+            elif in_failure_section and line.strip():
+                failure_lines.append(line)
+            elif in_failure_section and not line.strip():
+                # Empty line might end failure section, but continue for a few more lines
+                failure_lines.append(line)
+            elif in_failure_section and len(failure_lines) > 20:
+                # Limit output to prevent spam
+                failure_lines.append("... (truncated)")
+                break
+        
+        if failure_lines:
+            for line in failure_lines:
+                print(line)
+        else:
+            # If no specific failure lines found, show last 20 lines
+            print("Last 20 lines of output:")
+            for line in lines[-20:]:
+                print(line)
+        print("=" * 60)
+    elif not quiet:
+        sys.stdout.write(out)
+        sys.stdout.flush()
+    
+    return success
+
+
+def parse_cpus(cpu_str: str) -> List[str]:
+    return [c.strip() for c in cpu_str.split(",") if c.strip()]
+
+
+
+
+def main(argv: List[str]) -> int:
+    ap = argparse.ArgumentParser(description="Build and run CMSIS-NN UnitTests on FVP Corstone-300 (Python).")
+    ap.add_argument("-c", "--cpu", default="cortex-m55", help="Comma-separated cores, e.g. cortex-m3,cortex-m55")
+    ap.add_argument("-o", "--opt", default="-Ofast", help="Optimization level passed via CMSIS_OPTIMIZATION_LEVEL")
+    ap.add_argument("-q", "--quiet", action="store_true", help="Reduce build and run verbosity")
+    ap.add_argument("-b", "--no-build", action="store_true", help="Skip build (only run)")
+    ap.add_argument("-r", "--no-run", action="store_true", help="Skip run (only build)")
+    ap.add_argument("-e", "--no-setup", action="store_true", help="Skip dependency setup")
+    ap.add_argument("-a", "--use-arm-compiler", action="store_true", help="Use Arm Compiler (default: GCC)")
+    ap.add_argument("-p", "--no-venv", action="store_true", help="(Kept for parity; no effect on CMake build)")
+    ap.add_argument("-f", "--no-fvp-from-download", action="store_true", help="Do NOT use downloaded FVP; use FVP from PATH")
+    ap.add_argument("-g", "--no-gcc-from-download", action="store_true", help="Do NOT use downloaded GCC; use system GCC")
+    ap.add_argument("-u", "--ethos-path", type=Path, help="Override ethos-u-core-platform path")
+    ap.add_argument("-C", "--cmsis5-path", type=Path, help="Override CMSIS_5 path")
+    ap.add_argument("-D", "--cmake-def", action="append", default=[], help="Extra -DVAR=VAL for CMake (repeatable)")
+    ap.add_argument("--downloads-dir", type=Path, default=DEFAULT_DL, help="Downloads directory (default: ./downloads)")
+    ap.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE, help="CMake source dir (UnitTest root)")
+    ap.add_argument("--generator", help="CMake generator (e.g. Ninja)")
+    ap.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4, help="Parallel build jobs")
+    ap.add_argument("--timeout-run", type=float, default=0.0, help="Per-test timeout in seconds (0 = none)")
+    ap.add_argument("--fail-fast", action=argparse.BooleanOptionalAction, default=True, help="Stop on first failure")
+    ap.add_argument("--fvp-arg", action="append", default=[], help="Extra args to pass to the FVP (repeatable)")
+    args = ap.parse_args(argv)
+
+    if not is_linux():
+        die("This script supports Linux only (matching the original bash script).")
+
+    # Optional setup of downloads
+    if not args.no_setup:
+        call_setup_dependencies(args.downloads_dir)
+
+    # Resolve paths / env
+    ctx = detect_paths(args)
+    env = ctx["env"]
+    toolchain_file = ctx["toolchain_file"]
+    compiler_tag = ctx["compiler_tag"]
+    fvp_exe = ctx["fvp_exe"]
+    cmsis5 = ctx["cmsis5"]
+    source_dir = args.source_dir.resolve()
+
+    if not source_dir.exists():
+        die(f"CMake source dir not found: {source_dir}")
+
+    cpus = parse_cpus(args.cpu)
+    any_fail = False
+
+    for cpu in cpus:
+        print(f"\nTarget: {cpu} ({compiler_tag})")
+        build_dir = source_dir / f"build-{cpu}-{compiler_tag}"
+
+        if not args.no_build:
+            cmake_configure(
+                source_dir=source_dir,
+                build_dir=build_dir,
+                toolchain_file=toolchain_file,
+                cpu=cpu,
+                cmsis5=cmsis5,
+                optimization=args.opt,
+                extra_defs=args.cmake_def,
+                generator=args.generator,
+                quiet=args.quiet,
+                env=env,
+            )
+            cmake_build(build_dir=build_dir, quiet=args.quiet, env=env, jobs=args.jobs)
+
+        if args.no_run:
+            continue
+
+        elves = find_elves(build_dir)
+        if not elves:
+            print(f"(no .elf found under {build_dir}, nothing to run)")
+            continue
+
+        for elf in sorted(elves):
+            ok = run_fvp(fvp_exe=fvp_exe, elf=elf, timeout=args.timeout_run,
+                          quiet=args.quiet, extra_args=args.fvp_arg, env=env)
+            if not ok:
+                any_fail = True
+                if args.fail_fast:
+                    print("Stopping early due to failure (--fail-fast).")
+                    return 1
+            else:
+                print(f"PASS: {elf} \n\n")
+
+    if any_fail:
+        return 1
+
+    print("\nAll requested builds/runs completed successfully.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

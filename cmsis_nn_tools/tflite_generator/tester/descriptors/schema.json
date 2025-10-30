@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "operator": {
+      "type": "string",
+      "enum": ["FullyConnected", "Conv2D", "DepthwiseConv2D", "MatMul", "Elementwise", "Add", "Mul", "Maximum", "Minimum", "Relu", "Relu6", "LeakyRelu", "Softmax", "Quantize", "Dequantize", "Pooling", "Transpose", "StridedSlice", "Pad", "LSTM", "SVDF", "Mean", "ReduceMax", "TransposeConv"]
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+    },
+    "input_shape": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 4
+    },
+    "filter_shape": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 4
+    },
+    "input_1_shape": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 4
+    },
+    "input_2_shape": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 4
+    },
+    "activation": {
+      "type": "string",
+      "enum": ["NONE", "RELU", "RELU6", "TANH", "SIGMOID"]
+    },
+    "activation_dtype": {
+      "type": "string",
+      "enum": ["S8", "S16"]
+    },
+    "weight_dtype": {
+      "type": "string",
+      "enum": ["S8", "S4"]
+    },
+    "hint": {
+      "type": "object",
+      "properties": {
+        "kernel": {
+          "type": "string"
+        },
+        "call_style": {
+          "type": "string",
+          "enum": ["per_channel", "per_tensor"]
+        },
+        "transpose_weights": {
+          "type": "boolean"
+        },
+        "extras": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "required": ["operator", "name", "activation_dtype", "weight_dtype"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"operator": {"const": "FullyConnected"}}
+      },
+      "then": {
+        "required": ["input_shape", "filter_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Conv2D"}}
+      },
+      "then": {
+        "required": ["input_shape", "filter_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "DepthwiseConv2D"}}
+      },
+      "then": {
+        "required": ["input_shape", "filter_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "MatMul"}}
+      },
+      "then": {
+        "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Elementwise"}}
+      },
+      "then": {
+        "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Add"}}
+      },
+      "then": {
+        "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Mul"}}
+      },
+      "then": {
+        "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Maximum"}}
+      },
+      "then": {
+        "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Minimum"}}
+      },
+      "then": {
+        "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Relu"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Relu6"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "LeakyRelu"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Softmax"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Quantize"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Dequantize"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Pooling"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Transpose"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "StridedSlice"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Pad"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "LSTM"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "SVDF"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+=====================================================================================
+Fast Models 11.24 Release Notes for Corstone SSE-300 Reference Design FVP
+=====================================================================================
+
+These release notes relate to Corstone SSE-300 Ethos-U55 and Corstone SSE-300
+Ethos-U65 FVPs. These models implement the Corstone SSE-300 system as specified
+by the Corstone SSE-300 architecture and system specifications.
+
+--------------------------------------------------------------------------------
+New features in this release
+--------------------------------------------------------------------------------
+
+* Virtual Streaming Interface
+
+----------------------------------------------------------------------------------------
+Quality level
+----------------------------------------------------------------------------------------
+
+This is a public release of Corstone SSE-300 Ethos-U55 and Corstone SSE-300 Ethos-U65 FVPs
+
+--------------------------------------------------------------------------------
+Known issues
+--------------------------------------------------------------------------------
+
+None
+
+--------------------------------------------------------------------------------
+Differences between the model and the MPS3 specification
+--------------------------------------------------------------------------------
+
+The Ethernet controller in the model is a LAN91C111. The MPS3 documents
+(including those for pre-v8-M cores) specify a LAN9220.
+
+In the Memory Gating Unit, the model provides a configurable block size. For
+performance reasons, the minimum block size in the model is currently 4096 bytes.
+Hardware and later models may allow smaller block sizes. Software should always
+use the BLK_CFG register to determine block size.
+
+Some of the peripherals have minimal implementations:
+ - The Audio and USB controllers are RAZ/WI.
+ - Only the touchscreen functionality of the STMPE811 touchscreen controller is
+   implemented.
+ - A subset of the MPS3 LCD module's graphics modes and commands are supported.
+
+The usual general Fast Model restrictions apply.
+
+--------------------------------------------------------------------------------
+Running the model
+--------------------------------------------------------------------------------
+
+Refer to the Fast Models User Guide for general instructions on running FVPs.
+Refer to the Arm Corstone SSE-300 reference design Technical Overview for
+information on the compute subsystem and how to work with it.
+
+This model is intended to be used with the Arm reference design software package.
+
+--------------------------------------------------------------------------------
+Parameters
+--------------------------------------------------------------------------------
+
+The full set of parameters and their descriptions can be seen by running the
+model with the --list-params argument. Most Cortex-M55 core parameters share
+their names with a corresponding RTL configuration parameter.
+
+For those new to TrustZone for Cortex-M, however, it may be useful to run the
+model with some of these features disabled. Running the model with the following
+parameters disables the IDAU and the Security Gates:
+
+FVP_MPS3_Corstone_SSE-300_Ethos-U55 --parameter idau.NUM_IDAU_REGION=0 \
+                     --parameter mps3_board.DISABLE_GATING=1
+
+FVP_MPS3_Corstone_SSE-300_Ethos-U65 --parameter idau.NUM_IDAU_REGION=0 \
+                     --parameter mps3_board.DISABLE_GATING=1
+
+--------------------------------------------------------------------------------
+FPGA SRAM sizes
+--------------------------------------------------------------------------------
+
+As part of aligning with AN552 Issue B, the default sizes of FPGA SRAM and
+Corstone-300 Internal SRAM have been reduced to 1MB and 2x1MB respectively,
+however both can be adjusted using parameters.
+
+Running the model with the following parameters configures the SRAM size to 2MB
+for FPGA SRAM and 2x2MB for Internal SRAM:
+
+FVP_MPS3_Corstone_SSE-300_Ethos-U55 --parameter mps3_board.FPGA_SRAM_SIZE=2 \
+                     --parameter mps3_board.sse300.VM_BANK_SIZE=2048
+
+FVP_MPS3_Corstone_SSE-300_Ethos-U65 --parameter mps3_board.FPGA_SRAM_SIZE=2 \
+                     --parameter mps3_board.sse300.VM_BANK_SIZE=2048
+
+--------------------------------------------------------------------------------
+Prerequisites for Virtual Streaming Interface
+--------------------------------------------------------------------------------
+
+On Windows 10 and 11:
+Install Python 3.9.11. If Python 3.9.11 installation path is not located in default
+"Program Files" or "AppData", environment variable PYTHONHOME should be set as follows:
+set PYTHONHOME=<Installation Path>
+For example:
+set PYTHONHOME=c:\python3.9.11
+
+Ubuntu 20.04, 22.04 and 23.04:
+Execute the following commands to build and install Python 3.9.18.
+
+sudo apt-get update
+sudo apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev
+libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev xzutils
+tk-dev liblzma-dev tk-dev
+wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz
+tar xzf Python-3.9.18.tgz
+cd Python-3.9.18
+./configure --enable-optimizations --prefix=/opt/python/3.9.18/ 
+make -j "$(nproc)"
+sudo make altinstall
+
+Before running the FVP, set the following environment variable:
+export PYTHONHOME=/opt/python/3.9.18
+
+Date:  2024/01/04 15:19:02 GMT
+Build: 11.24:13
+
+===============================================================================
+END
+===============================================================================

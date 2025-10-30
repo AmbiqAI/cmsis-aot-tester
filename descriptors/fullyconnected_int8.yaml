@@ -1,0 +1,18 @@
+operator: FullyConnected
+name: fullyconnected_int8
+activation_dtype: S8
+weight_dtype: S8
+activation: NONE
+hint:
+  call_style: per_tensor
+input_shape:
+- 1 #batch size
+- 1 #input height
+- 1 #input width
+- 10 #input channels
+filter_shape:
+- 6 #output channels
+- 1 #output height
+- 1 #output width
+- 10 #input channels
+

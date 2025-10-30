@@ -1,0 +1,192 @@
+"""
+Main TFLite model generation for CMSIS-NN tester.
+Thin generator that discovers YAML descriptors and generates TFLite models.
+"""
+
+import pytest
+import os
+import tempfile
+import numpy as np
+from pathlib import Path
+from typing import Dict, Any, List
+
+from tester.io.descriptors import load_all_descriptors
+from tester.ops.fully_connected import OpFullyConnected
+from tester.ops.conv2d import OpConv2D
+from tester.ops.dwconv import OpDepthwiseConv2D
+from tester.ops.matmul_batch import OpMatMul
+from tester.ops.elementwise import OpElementwise
+from tester.ops.add import OpAdd
+from tester.ops.mul import OpMul
+from tester.ops.maximum import OpMaximum
+from tester.ops.minimum import OpMinimum
+from tester.ops.relu import OpRelu
+from tester.ops.relu6 import OpRelu6
+from tester.ops.leakyrelu import OpLeakyRelu
+from tester.ops.softmax import OpSoftmax
+from tester.ops.quantize import OpQuantize
+from tester.ops.dequantize import OpDequantize
+from tester.ops.pooling import OpPooling
+from tester.ops.transpose import OpTranspose
+from tester.ops.stridedslice import OpStridedSlice
+from tester.ops.pad import OpPad
+from tester.ops.lstm import OpLSTM
+from tester.ops.svdf import OpSVDF
+from tester.ops.mean import OpMean
+from tester.ops.reducemax import OpReduceMax
+from tester.ops.transposeconv import OpTransposeConv
+
+
+# Operation mapping
+OP_MAP = {
+    'FullyConnected': OpFullyConnected,
+    'Conv2D': OpConv2D,
+    'DepthwiseConv2D': OpDepthwiseConv2D,
+    'MatMul': OpMatMul,
+    'Elementwise': OpElementwise,
+    'Add': OpAdd,
+    'Mul': OpMul,
+    'Maximum': OpMaximum,
+    'Minimum': OpMinimum,
+    'Relu': OpRelu,
+    'Relu6': OpRelu6,
+    'LeakyRelu': OpLeakyRelu,
+    'Softmax': OpSoftmax,
+    'Quantize': OpQuantize,
+    'Dequantize': OpDequantize,
+    'Pooling': OpPooling,
+    'Transpose': OpTranspose,
+    'StridedSlice': OpStridedSlice,
+    'Pad': OpPad,
+    'LSTM': OpLSTM,
+    'SVDF': OpSVDF,
+    'Mean': OpMean,
+    'ReduceMax': OpReduceMax,
+    'TransposeConv': OpTransposeConv,
+}
+
+
+def should_run_test(desc: Dict[str, Any], filters: Dict[str, Any]) -> bool:
+    """
+    Determine if test should run based on filters.
+    
+    Args:
+        desc: Test descriptor
+        filters: Filter dictionary from command line
+        
+    Returns:
+        True if test should run
+    """
+    # Filter by operator (match against descriptor name)
+    if filters['op'] and desc['name'] != filters['op']:
+        return False
+        
+    # Filter by activation dtype
+    if filters['dtype'] and desc['activation_dtype'] != filters['dtype']:
+        return False
+        
+    # Filter by weight dtype
+    if filters['wtype'] and desc['weight_dtype'] != filters['wtype']:
+        return False
+            
+    return True
+
+
+def generate_test(desc: Dict[str, Any], out_dir: str) -> None:
+    """
+    Generate TFLite model for a descriptor.
+    
+    Args:
+        desc: YAML descriptor
+        out_dir: Output directory for generated files
+    """
+    name = desc['name']
+    operator = desc['operator']
+    
+    # Create output directory
+    test_dir = Path(out_dir) / name
+    test_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get operation class
+    if operator not in OP_MAP:
+        raise ValueError(f"Unsupported operator: {operator}")
+        
+    op_class = OP_MAP[operator]
+    
+    # Initialize operation with deterministic seed
+    seed = hash(name) % (2**32)  # Deterministic seed from name
+    op = op_class(desc, seed)
+    
+    # Build Keras model
+    model = op.build_keras_model()
+    
+    # Convert to TFLite
+    tflite_path = test_dir / f"{name}.tflite"
+    op.convert_to_tflite(model, str(tflite_path), seed)
+    
+    print(f"Generated TFLite model: {name}")
+
+
+def test_generation(test_filters):
+    """
+    Generate TFLite models for all descriptors.
+    """
+    # Load all descriptors
+    # Prefer top-level converted/ if present; otherwise, fall back to in-tree descriptors
+    top_level_converted = Path(__file__).resolve().parents[2] / "descriptors"
+    if top_level_converted.exists():
+        descriptors = load_all_descriptors(str(top_level_converted))
+    else:
+        descriptors_dir = "tester/descriptors"
+        descriptors = load_all_descriptors(descriptors_dir)
+    
+    # Apply filters
+    filtered_descriptors = []
+    for desc in descriptors:
+        if should_run_test(desc, test_filters):
+            filtered_descriptors.append(desc)
+            
+    # Apply limit
+    if test_filters.get('limit'):
+        filtered_descriptors = filtered_descriptors[:test_filters['limit']]
+        
+    # Generate TFLite models for each descriptor
+    # Place models in repo-top GeneratedTests
+    generated_count = 0
+    for desc in filtered_descriptors:
+        try:
+            top_generated = Path(__file__).resolve().parents[2] / "GeneratedTests"
+            generate_test(desc, str(top_generated))
+            generated_count += 1
+        except Exception as e:
+            print(f"Failed to generate TFLite model for {desc['name']}: {e}")
+            # Continue with other models
+            continue
+            
+    print(f"Successfully generated {generated_count} TFLite models")
+    assert generated_count > 0, "No TFLite models were generated"
+
+
+def test_generated_files_exist():
+    """
+    Verify that generated TFLite files exist and are valid.
+    This should run AFTER test_generation().
+    """
+    # Don't generate, just validate what test_generation() created
+    generated_tests_dir = Path("../GeneratedTests")
+    if not generated_tests_dir.exists():
+        pytest.skip("No generated tests found")
+        
+    # Check that we have some generated tests
+    test_dirs = [d for d in generated_tests_dir.iterdir() if d.is_dir()]
+    assert len(test_dirs) > 0, "No test directories found"
+    
+    # Check that each test has TFLite file
+    for test_dir in test_dirs:
+        name = test_dir.name
+        tflite_file = test_dir / f"{name}.tflite"
+        
+        assert tflite_file.exists(), f"Missing {name}.tflite"
+        
+        # Check that file is not empty
+        assert tflite_file.stat().st_size > 0, f"{name}.tflite is empty"

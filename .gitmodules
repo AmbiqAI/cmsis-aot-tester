@@ -1,9 +1,9 @@
 [submodule "modules/helia-aot"]
 	path = modules/helia-aot
-	url = git@github.com:AmbiqAI/helia-aot.git
+	url = https://github.com/AmbiqAI/helia-aot.git
 [submodule "modules/ns-cmsis-nn"]
 	path = modules/ns-cmsis-nn
-	url = git@github.com:AmbiqAI/ns-cmsis-nn.git
+	url = https://github.com/AmbiqAI/ns-cmsis-nn.git
 [submodule "modules/neuralSPOT"]
 	path = modules/neuralSPOT
 	url = https://github.com/AmbiqAI/neuralSPOT.git
