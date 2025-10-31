@@ -2,10 +2,9 @@
 Maximum and Minimum operations implementation for CMSIS-NN tester,
 """
 
-from typing import Dict, Any, Callable, Iterable, List, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Tuple
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Layer
 from .base import OperationBase
 
 
@@ -13,7 +12,7 @@ from .base import OperationBase
 # Helper layers / utilities
 # ----------------------------
 
-class CustomMinMaxLayer(Layer):
+class CustomMinMaxLayer(tf.keras.layers.Layer):
     """Custom layer wrapper for tf.minimum and tf.maximum operations."""
     def __init__(self, op_fn: Callable, **kwargs):
         super().__init__(**kwargs)
@@ -27,7 +26,7 @@ class CustomMinMaxLayer(Layer):
 # tensors that pass through it. Use the SAME INSTANCE on both branches.
 # This is a hack to get around the unnecessary requantization nodes that
 # would otherwise be inserted by the TFLite converter. provided by GPT
-class SharedFakeQuant(Layer):
+class SharedFakeQuant(tf.keras.layers.Layer):
     """
     A shared FakeQuant layer that forces identical calibration range for any
     tensors that pass through it. Use the SAME INSTANCE on both branches.

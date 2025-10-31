@@ -193,6 +193,7 @@ def expand_descriptor_variations(desc: Dict[str, Any]) -> List[Dict[str, Any]]:
     
     expanded_descriptors = []
     base_desc = {k: v for k, v in desc.items() if k != 'variations'}
+    base_name = base_desc['name']  # Preserve original base name
     
     for variation in desc['variations']:
         # Create a new descriptor for this variation
@@ -208,6 +209,9 @@ def expand_descriptor_variations(desc: Dict[str, Any]) -> List[Dict[str, Any]]:
         else:
             # Generate a name based on variation index
             variation_desc['name'] = f"{base_desc['name']}_var_{len(expanded_descriptors)}"
+        
+        # Store base descriptor name for filtering purposes
+        variation_desc['_base_name'] = base_name
         
         # Validate the expanded variation has required shapes
         operator = variation_desc['operator']

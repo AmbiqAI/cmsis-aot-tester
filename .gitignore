@@ -16,5 +16,5 @@ reports/*
 .env.test
 .env.production
 downloads/*
-*.pyc
-
+**/*.pyc
+**/__pycache__/

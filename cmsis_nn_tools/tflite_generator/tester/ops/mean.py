@@ -2,7 +2,6 @@
 Mean operation implementation for CMSIS-NN tester.
 """
 
-from typing import Dict, Any
 import numpy as np
 import tensorflow as tf
 from .base import OperationBase  

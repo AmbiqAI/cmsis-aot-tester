@@ -78,11 +78,18 @@ def should_run_test(desc: Dict[str, Any], filters: Dict[str, Any]) -> bool:
     """
     # Filter by operator (match against descriptor name)
     # Support exact match or prefix match (for numbered descriptors from same YAML file)
+    # Also support matching base descriptor name (for variations)
     if filters['op']:
         filter_op = filters['op']
         desc_name = desc['name']
+        base_name = desc.get('_base_name', None)
+        
         # Exact match OR prefix match (for numbered variants like name_1, name_2, etc.)
-        if desc_name != filter_op and not desc_name.startswith(filter_op + '_'):
+        # OR match base name (for variations like add_small from base add_int16)
+        name_matches = desc_name == filter_op or desc_name.startswith(filter_op + '_')
+        base_matches = base_name == filter_op if base_name else False
+        
+        if not name_matches and not base_matches:
             return False
         
     # Filter by activation dtype
