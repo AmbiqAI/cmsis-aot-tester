@@ -5,7 +5,7 @@ Descriptor ingestion with dtype validation and kernel resolution.
 import yaml
 import json
 import os
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 from pathlib import Path
 
 
@@ -37,19 +37,16 @@ def validate_dtype_combo(activation_dtype: str, weight_dtype: str) -> bool:
     return (activation_dtype, weight_dtype) in ALLOWED_DTYPE_COMBOS
 
 
-def load_descriptor(desc_path: str) -> Dict[str, Any]:
+def _validate_and_normalize_descriptor(desc: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Load and validate YAML descriptor.
+    Validate and normalize a single descriptor dictionary.
     
     Args:
-        desc_path: Path to YAML descriptor
+        desc: Descriptor dictionary to validate
         
     Returns:
-        Validated descriptor dictionary
+        Validated and normalized descriptor dictionary
     """
-    with open(desc_path, 'r') as f:
-        desc = yaml.safe_load(f)
-        
     # Validate required fields
     required_fields = ['operator', 'name', 'activation_dtype', 'weight_dtype']
     for field in required_fields:
@@ -93,6 +90,38 @@ def load_descriptor(desc_path: str) -> Dict[str, Any]:
         desc['hint'] = {}
         
     return desc
+
+
+def load_descriptor(desc_path: str) -> List[Dict[str, Any]]:
+    """
+    Load and validate YAML descriptor(s) from a file.
+    Supports multiple descriptors in a single YAML file (separated by ---).
+    
+    Args:
+        desc_path: Path to YAML descriptor file
+        
+    Returns:
+        List of validated descriptor dictionaries (one per YAML document in the file)
+    """
+    with open(desc_path, 'r') as f:
+        documents = list(yaml.safe_load_all(f))
+    
+    # Filter out None documents (empty separators)
+    documents = [doc for doc in documents if doc is not None]
+    
+    if not documents:
+        raise ValueError(f"No valid descriptors found in {desc_path}")
+    
+    # Validate and normalize each descriptor
+    descriptors = []
+    for i, doc in enumerate(documents):
+        try:
+            validated_desc = _validate_and_normalize_descriptor(doc)
+            descriptors.append(validated_desc)
+        except Exception as e:
+            raise ValueError(f"Error validating descriptor {i+1} in {desc_path}: {e}")
+    
+    return descriptors
 
 
 def resolve_kernel(desc: Dict[str, Any]) -> str:
@@ -184,7 +213,7 @@ def expand_descriptor_variations(desc: Dict[str, Any]) -> List[Dict[str, Any]]:
         operator = variation_desc['operator']
         if operator == 'FullyConnected':
             if 'input_shape' not in variation_desc or 'filter_shape' not in variation_desc:
-                raise ValueError(f"FullyConnected variation requires input_shape and filter_shape")
+                raise ValueError("FullyConnected variation requires input_shape and filter_shape")
         elif operator in ['Conv2D', 'DepthwiseConv2D']:
             if 'input_shape' not in variation_desc or 'filter_shape' not in variation_desc:
                 raise ValueError(f"{operator} variation requires input_shape and filter_shape")
@@ -213,6 +242,8 @@ def expand_descriptor_variations(desc: Dict[str, Any]) -> List[Dict[str, Any]]:
 def load_all_descriptors(descriptors_dir: str) -> List[Dict[str, Any]]:
     """
     Load and validate all descriptors in directory.
+    Supports multiple descriptors per YAML file (separated by ---).
+    Descriptors from the same file are numbered: filename_1, filename_2, etc.
     
     Args:
         descriptors_dir: Directory containing YAML descriptors
@@ -225,10 +256,30 @@ def load_all_descriptors(descriptors_dir: str) -> List[Dict[str, Any]]:
     
     for desc_path in desc_paths:
         try:
-            desc = load_descriptor(desc_path)
-            # Expand variations into individual descriptors
-            expanded_descs = expand_descriptor_variations(desc)
-            descriptors.extend(expanded_descs)
+            # load_descriptor now returns a list (supports multiple docs per file)
+            descs = load_descriptor(desc_path)
+            
+            # Get base filename without extension for numbering
+            file_base = Path(desc_path).stem
+            
+            # If multiple descriptors from same file, number them
+            if len(descs) > 1:
+                # Expand variations into individual descriptors for each descriptor
+                for idx, desc in enumerate(descs, start=1):
+                    # Create numbered name based on YAML filename
+                    numbered_name = f"{file_base}_{idx}"
+                    
+                    # Create a copy and update the name
+                    desc_copy = desc.copy()
+                    desc_copy['name'] = numbered_name
+                    
+                    expanded_descs = expand_descriptor_variations(desc_copy)
+                    descriptors.extend(expanded_descs)
+            else:
+                # Single descriptor - use original name or file-based name
+                for desc in descs:
+                    expanded_descs = expand_descriptor_variations(desc)
+                    descriptors.extend(expanded_descs)
         except Exception as e:
             print(f"Warning: Failed to load descriptor {desc_path}: {e}")
             continue

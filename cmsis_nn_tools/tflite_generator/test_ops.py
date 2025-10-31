@@ -18,8 +18,7 @@ from tester.ops.matmul_batch import OpMatMul
 from tester.ops.elementwise import OpElementwise
 from tester.ops.add import OpAdd
 from tester.ops.mul import OpMul
-from tester.ops.maximum import OpMaximum
-from tester.ops.minimum import OpMinimum
+from tester.ops.minmax import OpMinMax
 from tester.ops.relu import OpRelu
 from tester.ops.relu6 import OpRelu6
 from tester.ops.leakyrelu import OpLeakyRelu
@@ -46,8 +45,8 @@ OP_MAP = {
     'Elementwise': OpElementwise,
     'Add': OpAdd,
     'Mul': OpMul,
-    'Maximum': OpMaximum,
-    'Minimum': OpMinimum,
+    'Maximum': OpMinMax,
+    'Minimum': OpMinMax,
     'Relu': OpRelu,
     'Relu6': OpRelu6,
     'LeakyRelu': OpLeakyRelu,
@@ -78,8 +77,13 @@ def should_run_test(desc: Dict[str, Any], filters: Dict[str, Any]) -> bool:
         True if test should run
     """
     # Filter by operator (match against descriptor name)
-    if filters['op'] and desc['name'] != filters['op']:
-        return False
+    # Support exact match or prefix match (for numbered descriptors from same YAML file)
+    if filters['op']:
+        filter_op = filters['op']
+        desc_name = desc['name']
+        # Exact match OR prefix match (for numbered variants like name_1, name_2, etc.)
+        if desc_name != filter_op and not desc_name.startswith(filter_op + '_'):
+            return False
         
     # Filter by activation dtype
     if filters['dtype'] and desc['activation_dtype'] != filters['dtype']:

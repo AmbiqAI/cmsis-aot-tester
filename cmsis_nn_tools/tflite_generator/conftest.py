@@ -26,7 +26,7 @@ def pytest_configure(config):
     generated_tests_dir = Path(__file__).resolve().parents[2] / "GeneratedTests"
     
     if generated_tests_dir.exists():
-        print(f"\n🧹 Cleaning existing GeneratedTests directory...")
+        print(f"\nCleaning existing GeneratedTests directory...")
         try:
             # Count existing files before deletion
             existing_count = sum(1 for _ in generated_tests_dir.rglob("*.tflite"))
@@ -43,7 +43,7 @@ def pytest_configure(config):
                     item.unlink()
                 elif item.is_dir():
                     shutil.rmtree(item)
-            print(f"   ✅ Individual files removed")
+            print(f"   Individual files removed")
     
     # Create fresh directory
     generated_tests_dir.mkdir(exist_ok=True)

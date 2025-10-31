@@ -24,19 +24,6 @@ class OpAdd(OperationBase):
         
         # Add operation
         x = tf.keras.layers.Add()([input1, input2])
-        
-        # Apply activation if specified
-        activation = self.desc.get('activation', 'NONE')
-        if activation == 'RELU':
-            x = tf.keras.layers.ReLU()(x)
-        elif activation == 'RELU6':
-            x = tf.keras.layers.ReLU(max_value=6)(x)
-        elif activation == 'TANH':
-            x = tf.keras.layers.Activation('tanh')(x)
-        elif activation == 'SIGMOID':
-            x = tf.keras.layers.Activation('sigmoid')(x)
-        elif activation != 'NONE':
-            raise ValueError(f"Unsupported activation: {activation}")
             
         model = tf.keras.Model(inputs=[input1, input2], outputs=x)
         return model
@@ -60,8 +47,7 @@ class OpAdd(OperationBase):
         elif activation_dtype == 'S16':
             converter.optimizations = [tf.lite.Optimize.DEFAULT]
             converter.target_spec.supported_types = [tf.int16]
-            # For int16 quantization, keep input/output as float32
-            # For int16 quantization, keep input/output as float32
+
         
         # Generate representative dataset
         def representative_data_gen():

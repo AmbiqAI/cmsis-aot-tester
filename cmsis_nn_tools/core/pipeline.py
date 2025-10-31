@@ -134,10 +134,10 @@ class FullTestPipeline:
     def _step1_generate_tflite_models(self) -> bool:
         """Step 1: Generate TFLite models."""
         self.logger.info("Step 1/5: Generate TFLite Models")
-        self.logger.info("Generating TensorFlow Lite models using pytest in TfliteGenerator")
+        self.logger.info("Generating TensorFlow Lite models using pytest in tflite generator")
         
         if not self.config.tflite_generator_dir.exists():
-            self.logger.error(f"TfliteGenerator directory not found: {self.config.tflite_generator_dir.absolute()}")
+            self.logger.error(f"tflite generator directory not found: {self.config.tflite_generator_dir.absolute()}")
             return False
         
         # Build pytest command

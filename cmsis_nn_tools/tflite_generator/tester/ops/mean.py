@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from .base import OperationBase  
 
-class Mean(tf.keras.layers.Layer):
+class CustomMeanLayer(tf.keras.layers.Layer):
     def call(self, x, ax = [1]):
         return tf.reduce_mean(x, axis= ax, keepdims=False, name="mean")
 
@@ -22,7 +22,7 @@ class OpMean(OperationBase):
         
         inputs = tf.keras.Input(shape=input_shape[1:], dtype=tf.float32, name='input')
         # Mean operation - compute mean across all dimensions except batch
-        output = Mean()(inputs)
+        output = CustomMeanLayer()(inputs)
         
         model = tf.keras.Model(inputs=inputs, outputs=output)
         return model

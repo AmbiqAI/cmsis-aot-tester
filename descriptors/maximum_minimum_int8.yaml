@@ -1,5 +1,5 @@
-operator: Add
-name: add_int8
+operator: Maximum
+name: maximum_minimum_int8
 activation_dtype: S8
 weight_dtype: S8
 activation: NONE

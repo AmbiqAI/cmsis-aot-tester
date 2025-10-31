@@ -2,7 +2,7 @@
 .devcontainer/
 pytest_cache/
 build*/
-GeneratedTests/*
+GeneratedTests/
 modules/*
 reports/*
 .vscode/
@@ -15,3 +15,6 @@ reports/*
 .env.development
 .env.test
 .env.production
+downloads/*
+*.pyc
+

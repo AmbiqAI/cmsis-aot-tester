@@ -29,8 +29,6 @@ class OpMatMul(OperationBase):
 
     def convert_to_tflite(self, model, out_path: str, rep_seed: int) -> None:
         """Convert Keras model to TFLite with quantization."""
-        import tensorflow as tf
-        import numpy as np
         
         # Create converter
         converter = tf.lite.TFLiteConverter.from_keras_model(model)

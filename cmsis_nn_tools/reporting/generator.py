@@ -3,11 +3,10 @@ Report generator for multiple output formats.
 """
 
 import json
-from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 
-from .models import TestReport, TestResult, TestStatus
+from .models import TestReport
 
 
 class ReportGenerator:
@@ -264,18 +263,18 @@ class ReportGenerator:
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Passed | {status_counts["passed"]} | {pass_rate:.1f}% |
-| ❌ Failed | {status_counts["failed"]} | {fail_rate:.1f}% |
-| ⏭️ Skipped | {status_counts["skipped"]} | {skip_rate:.1f}% |
+| Passed | {status_counts["passed"]} | {pass_rate:.1f}% |
+| Failed | {status_counts["failed"]} | {fail_rate:.1f}% |
+| Skipped | {status_counts["skipped"]} | {skip_rate:.1f}% |
 """
         
         if status_counts["timed_out"] > 0:
             timeout_rate = (status_counts["timed_out"] / total * 100)
-            md += f"| ⏰ Timed Out | {status_counts['timed_out']} | {timeout_rate:.1f}% |\n"
+            md += f"| Timed Out | {status_counts['timed_out']} | {timeout_rate:.1f}% |\n"
         
         if status_counts["errors"] > 0:
             error_rate = (status_counts["errors"] / total * 100)
-            md += f"| 💥 Errors | {status_counts['errors']} | {error_rate:.1f}% |\n"
+            md += f"| Errors | {status_counts['errors']} | {error_rate:.1f}% |\n"
         
         md += "\n## Test Results\n\n"
         
@@ -284,16 +283,9 @@ class ReportGenerator:
         md += "|-----------|--------|--------------|----------------|\n"
         
         for result in report.results:
-            status_emoji = {
-                TestStatus.PASS: "✅",
-                TestStatus.FAIL: "❌", 
-                TestStatus.SKIP: "⏭️",
-                TestStatus.TIMEOUT: "⏰",
-                TestStatus.ERROR: "💥"
-            }.get(result.status, "❓")
             
             failure_reason = result.failure_reason or result.skip_reason or ""
-            md += f"| {result.test_name} | {status_emoji} {result.status.value} | {result.duration:.2f} | {failure_reason} |\n"
+            md += f"| {result.test_name} | {result.duration:.2f} | {failure_reason} |\n"
         
         # Add detailed failure information
         if failed_tests:

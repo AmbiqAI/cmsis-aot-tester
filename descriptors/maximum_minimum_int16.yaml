@@ -1,0 +1,20 @@
+operator: Maximum
+name: maximum_minimum_int16
+activation_dtype: S16
+weight_dtype: S8
+input_1_shape: [1, 32, 32, 3]
+input_2_shape: [1, 32, 32, 3]
+---
+operator: Maximum
+name: maximum_int16
+activation_dtype: S16
+weight_dtype: S8
+input_1_shape: [1, 4, 4, 14]
+input_2_shape: [1, 4, 4, 14]
+---
+operator: Minimum
+name: minimum_int16
+activation_dtype: S16
+weight_dtype: S8
+input_1_shape: [1, 2, 2, 7]
+input_2_shape: [1, 2, 2, 7]

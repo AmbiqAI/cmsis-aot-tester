@@ -214,9 +214,19 @@ foreach(TR_REL ${GENERATED_TEST_RUNNERS})
   # Processor-specific flags are now applied globally
 
   # Include dirs: generated public API and your local cmsis.h
+  # NeuralSPOT includes - add all neuralspot module includes-api directories
+  file(GLOB NEURALSPOT_INCLUDE_DIRS 
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/neuralSPOT/neuralspot/ns-*/includes-api"
+  )
+  
   target_include_directories(${TGT_NAME} PRIVATE
     "${TEST_DIR_ABS}/includes-api"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"   # for src/cmsis.h (PMU/DWT helpers) and ns_ambiqsuite_harness_fvp.h
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"   # for src/cmsis.h (PMU/DWT helpers)
+    ${NEURALSPOT_INCLUDE_DIRS}  # All neuralSPOT module includes
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/neuralSPOT/extern/AmbiqSuite/R5.1.0_rc27/utils"  # for am_util.h
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/neuralSPOT/extern/AmbiqSuite/R5.1.0_rc27/boards/apollo510_evb/bsp"  # for am_bsp.h (FVP uses apollo510)
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/neuralSPOT/extern/AmbiqSuite/R5.1.0_rc27/CMSIS/ARM/Include"  # CMSIS core headers
+    "${CMAKE_CURRENT_SOURCE_DIR}/modules/neuralSPOT/extern/AmbiqSuite/R5.1.0_rc27/CMSIS/AmbiqMicro/Include"  # Ambiq CMSIS device headers
     "${CMAKE_CURRENT_SOURCE_DIR}/modules/neuralSPOT/extern/CMSIS/CMSIS-DSP-1.16.2/Include"  # for arm_math.h
   )
 
