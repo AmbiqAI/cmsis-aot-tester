@@ -17,7 +17,6 @@ Usage:
 """
 
 import argparse
-import os
 import platform
 import shutil
 import subprocess
@@ -61,7 +60,7 @@ def download_file(url: str, dest_path: Path, description: str) -> None:
         with urllib.request.urlopen(url) as response:
             with open(dest_path, 'wb') as f:
                 shutil.copyfileobj(response, f)
-        print(f"Downloaded successfully")
+        print("Downloaded successfully")
     except Exception as e:
         print(f"Download failed: {e}")
         raise
@@ -102,7 +101,7 @@ def extract_tar_gz(archive_path: Path, extract_to: Path, strip_components: int =
                         print(f"Warning: Skipping {member.name}: {member_error}")
                     continue
     
-    print(f"Extracted successfully")
+    print("Extracted successfully")
 
 
 def run_command(cmd: list[str], cwd: Optional[Path] = None, description: str = "") -> None:
@@ -145,12 +144,12 @@ def setup_corstone300(downloads_dir: Path, force: bool = False) -> None:
         shutil.rmtree(corstone_dir)
 
     arch = get_architecture()
-    # if arch == 'x86_64':
-    #     corstone_url = "https://developer.arm.com/-/media/Arm%20Developer%20Community/Downloads/OSS/FVP/Corstone-300/FVP_Corstone_SSE-300_11.24_13_Linux64.tgz"
-    # elif arch == 'aarch64':
-    corstone_url = "https://developer.arm.com/-/media/Arm%20Developer%20Community/Downloads/OSS/FVP/Corstone-300/FVP_Corstone_SSE-300_11.24_13_Linux64_armv8l.tgz"
-    # else:
-        # raise RuntimeError(f"Unsupported architecture for Corstone300: {arch}")
+    if arch == 'x86_64':
+        corstone_url = "https://developer.arm.com/-/media/Arm%20Developer%20Community/Downloads/OSS/FVP/Corstone-300/FVP_Corstone_SSE-300_11.24_13_Linux64.tgz"
+    elif arch == 'aarch64':
+        corstone_url = "https://developer.arm.com/-/media/Arm%20Developer%20Community/Downloads/OSS/FVP/Corstone-300/FVP_Corstone_SSE-300_11.24_13_Linux64_armv8l.tgz"
+    else:
+        raise RuntimeError(f"Unsupported architecture for Corstone300: {arch}")
 
     # Work in temp dirs like the bash script
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -335,12 +334,9 @@ def setup_python_venv(downloads_dir: Path, force: bool = False) -> None:
         description="Creating Python virtual environment"
     )
     
-    # Activate and install requirements
     if sys.platform.startswith('win'):
-        activate_script = venv_dir / "Scripts" / "activate.bat"
         pip_cmd = str(venv_dir / "Scripts" / "pip")
     else:
-        activate_script = venv_dir / "bin" / "activate"
         pip_cmd = str(venv_dir / "bin" / "pip")
     
     # Check if requirements.txt exists
