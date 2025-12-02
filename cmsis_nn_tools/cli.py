@@ -150,7 +150,7 @@ def main() -> int:
         if requirements_file.exists():
             try:
                 subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)],
+                    ["python3", "-m", "pip", "install", "-r", str(requirements_file)],
                     cwd=repo_root,
                     check=True
                 )
