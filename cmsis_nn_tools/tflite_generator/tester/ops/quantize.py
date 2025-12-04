@@ -18,27 +18,29 @@ class OpQuantize(OperationBase):
     def build_keras_model(self) -> tf.keras.Model:
         """Build Keras model for Quantize operation.
         
-        Following the official CMSIS-NN test generator logic:
-        - Use an identity Dense layer to create a model that can be quantized
-        - Input shape is (1, 8, 1) which gets flattened to 8 elements
-        - Dense(8) with identity weights preserves the input
+        Creates a model that can be quantized by TFLite converter.
+        Uses an identity operation (Lambda layer) to preserve input values.
         """
-        model = tf.keras.Sequential()
-        model.add(tf.keras.Input(shape=(1, 8, 1)))
+        input_shape = self.desc['input_shape']
         
-        # Flatten to 1D vector of length 8
-        model.add(tf.keras.layers.Flatten())
+        # Build model with float32 inputs (will be quantized later)
+        inputs = tf.keras.Input(shape=input_shape[1:], dtype=tf.float32, name='input')
         
-        # Dense(8) with identity weights - this preserves input values
-        dense = tf.keras.layers.Dense(units=8, use_bias=False, activation=None)
-        model.add(dense)
+        # Use Lambda layer to create an identity operation
+        # This will be quantized by TFLite converter
+        x = tf.keras.layers.Lambda(lambda x: x, name='identity')(inputs)
         
-        # Build the model to initialize weights
-        model.build((None, 1, 8, 1))
+        # Apply activation if specified
+        activation_str = self.desc.get('activation', 'NONE')
+        if activation_str == 'RELU':
+            x = tf.keras.layers.ReLU()(x)
+        elif activation_str == 'RELU6':
+            x = tf.keras.layers.ReLU(max_value=6)(x)
+        elif activation_str != 'NONE':
+            raise ValueError(f"Unsupported activation: {activation_str}")
         
-        # Set identity weights to preserve input values
-        identity_weights = np.eye(8, dtype=np.float32)
-        dense.set_weights([identity_weights])
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        return model
         
 
     def convert_to_tflite(self, model, out_path: str, rep_seed: int) -> None:
@@ -59,9 +61,11 @@ class OpQuantize(OperationBase):
             converter.inference_output_type = tf.int8
         elif activation_dtype == 'S16':
             converter.optimizations = [tf.lite.Optimize.DEFAULT]
-            converter.target_spec.supported_types = [tf.int16]
-            # For int16 quantization, keep input/output as float32
-            # For int16 quantization, keep input/output as float32
+            converter.target_spec.supported_ops = [
+                tf.lite.OpsSet.EXPERIMENTAL_TFLITE_BUILTINS_ACTIVATIONS_INT16_WEIGHTS_INT8
+            ]
+            converter.inference_input_type = tf.int16
+            converter.inference_output_type = tf.int16
         
         # Generate representative dataset
         def representative_data_gen():
