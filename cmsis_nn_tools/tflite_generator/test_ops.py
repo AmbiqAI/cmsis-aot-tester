@@ -38,6 +38,9 @@ from tester.ops.lstm import OpLSTM
 from tester.ops.svdf import OpSVDF
 from tester.ops.mean import OpMean
 from tester.ops.reducemax import OpReduceMax
+from tester.ops.reducemin import OpReduceMin
+from tester.ops.argmax import OpArgMax
+from tester.ops.argmin import OpArgMin
 from tester.ops.transposeconv import OpTransposeConv
 from tester.ops.equal import OpEqual
 from tester.ops.not_equal import OpNotEqual
@@ -77,6 +80,9 @@ OP_MAP = {
     'SVDF': OpSVDF,
     'Mean': OpMean,
     'ReduceMax': OpReduceMax,
+    'ReduceMin': OpReduceMin,
+    'ArgMax': OpArgMax,
+    'ArgMin': OpArgMin,
     'TransposeConv': OpTransposeConv,
     'Equal': OpEqual,
     'NotEqual': OpNotEqual,

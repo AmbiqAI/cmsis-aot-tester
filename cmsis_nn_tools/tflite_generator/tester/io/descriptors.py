@@ -75,7 +75,7 @@ def _validate_and_normalize_descriptor(desc: Dict[str, Any]) -> Dict[str, Any]:
                 raise ValueError(f"{operator} requires input_shape and pool_size (or filter_shape)")
         elif operator in ['Relu', 'Relu6', 'LeakyRelu', 'Softmax', 'Quantize', 'Dequantize', 
                          'Transpose', 'StridedSlice', 'Pad', 'LSTM', 'SVDF',
-                         'Mean', 'ReduceMax', 'TransposeConv',
+                         'Mean', 'ReduceMax', 'ReduceMin', 'ArgMax', 'ArgMin', 'TransposeConv',
                          'Tanh', 'Logistic', 'HardSwish', 'PReLU']:
             if 'input_shape' not in desc:
                 raise ValueError(f"{operator} requires input_shape")

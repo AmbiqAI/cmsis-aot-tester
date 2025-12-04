@@ -6,9 +6,6 @@ import numpy as np
 import tensorflow as tf
 from .base import OperationBase  
 
-class CustomMeanLayer(tf.keras.layers.Layer):
-    def call(self, x, ax = [1]):
-        return tf.reduce_mean(x, axis= ax, keepdims=False, name="mean")
 
 class OpMean(OperationBase):
     """
@@ -20,21 +17,45 @@ class OpMean(OperationBase):
         input_shape = self.desc['input_shape']
         
         inputs = tf.keras.Input(shape=input_shape[1:], dtype=tf.float32, name='input')
-        # Mean operation - compute mean across all dimensions except batch
-        output = CustomMeanLayer()(inputs)
+        
+        # Get axes and keepdims from descriptor
+        axes = self.desc.get('axes', [1, 2])  # Default to spatial dimensions
+        keepdims = self.desc.get('keepdims', True)
+        
+        # Mean operation
+        output = tf.keras.layers.Lambda(
+            lambda x: tf.reduce_mean(x, axis=axes, keepdims=keepdims),
+            name='reduce_mean'
+        )(inputs)
         
         model = tf.keras.Model(inputs=inputs, outputs=output)
         return model
 
     def convert_to_tflite(self, model, out_path: str, rep_seed: int) -> None:
-        """Convert Keras model to TFLite with quantization."""        
+        """Convert Keras model to TFLite with quantization."""
+        import tensorflow as tf
+        import numpy as np
+        
         # Create converter
         converter = tf.lite.TFLiteConverter.from_keras_model(model)
         
         # Apply quantization based on activation_dtype
         activation_dtype = self.desc.get('activation_dtype', 'S8')
-                # Generate representative dataset
-        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        
+        if activation_dtype == 'S8':
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_types = [tf.int8]
+            converter.inference_input_type = tf.int8
+            converter.inference_output_type = tf.int8
+        elif activation_dtype == 'S16':
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_ops = [
+                tf.lite.OpsSet.EXPERIMENTAL_TFLITE_BUILTINS_ACTIVATIONS_INT16_WEIGHTS_INT8
+            ]
+            converter.inference_input_type = tf.int16
+            converter.inference_output_type = tf.int16
+        
+        # Generate representative dataset
         def representative_data_gen():
             for _ in range(100):
                 if 'input_shape' in self.desc:
@@ -46,19 +67,6 @@ class OpMean(OperationBase):
                     yield [inputs1, inputs2]
         
         converter.representative_dataset = representative_data_gen
-
-        if activation_dtype == 'S8':
-            converter.optimizations = [tf.lite.Optimize.DEFAULT]
-            converter.target_spec.supported_types = [tf.int8]
-            converter.inference_input_type = tf.int8
-            converter.inference_output_type = tf.int8
-        elif activation_dtype == 'S16':
-            # converter.optimizations = [tf.lite.OpsSet.EXPERIMENTAL_TFLITE_BUILTINS_ACTIVATIONS_INT16_WEIGHTS_INT8]
-            converter.target_spec.supported_ops = [tf.lite.OpsSet.EXPERIMENTAL_TFLITE_BUILTINS_ACTIVATIONS_INT16_WEIGHTS_INT8]
-            converter.inference_input_type  = tf.int16
-            converter.inference_output_type = tf.int16
-        
-
         
         # Convert and save
         tflite_model = converter.convert()

@@ -4,7 +4,7 @@
   "properties": {
     "operator": {
       "type": "string",
-      "enum": ["FullyConnected", "Conv2D", "DepthwiseConv2D", "MatMul", "Elementwise", "Add", "Sub", "Mul", "Maximum", "Minimum", "Relu", "Relu6", "LeakyRelu", "Softmax", "Tanh", "Logistic", "HardSwish", "PReLU", "Quantize", "Dequantize", "Pooling", "Transpose", "StridedSlice", "Pad", "LSTM", "SVDF", "Mean", "ReduceMax", "TransposeConv", "Equal", "NotEqual", "Greater", "GreaterEqual", "Less", "LessEqual"]
+      "enum": ["FullyConnected", "Conv2D", "DepthwiseConv2D", "MatMul", "Elementwise", "Add", "Sub", "Mul", "Maximum", "Minimum", "Relu", "Relu6", "LeakyRelu", "Softmax", "Tanh", "Logistic", "HardSwish", "PReLU", "Quantize", "Dequantize", "Pooling", "Transpose", "StridedSlice", "Pad", "LSTM", "SVDF", "Mean", "ReduceMax", "ReduceMin", "ArgMax", "ArgMin", "TransposeConv", "Equal", "NotEqual", "Greater", "GreaterEqual", "Less", "LessEqual"]
     },
     "name": {
       "type": "string",
@@ -74,6 +74,18 @@
     "padding": {
       "type": "string",
       "enum": ["valid", "same", "VALID", "SAME"]
+    },
+    "axes": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 0},
+      "minItems": 1
+    },
+    "axis": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "keepdims": {
+      "type": "boolean"
     },
     "hint": {
       "type": "object",
@@ -353,6 +365,46 @@
       },
       "then": {
         "required": ["input_1_shape", "input_2_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "Mean"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "ReduceMax"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "ReduceMin"}}
+      },
+      "then": {
+        "required": ["input_shape"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "ArgMax"}}
+      },
+      "then": {
+        "required": ["input_shape", "axis"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"operator": {"const": "ArgMin"}}
+      },
+      "then": {
+        "required": ["input_shape", "axis"]
       }
     }
   ]

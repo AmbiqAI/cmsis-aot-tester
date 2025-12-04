@@ -1,5 +1,5 @@
 """
-ReduceMax operation implementation.
+ReduceMin operation implementation.
 """
 
 from typing import Dict, Any
@@ -8,13 +8,13 @@ import tensorflow as tf
 from .base import OperationBase
 
 
-class OpReduceMax(OperationBase):
+class OpReduceMin(OperationBase):
     """
-    ReduceMax operation.
+    ReduceMin operation.
     """
     
     def build_keras_model(self) -> tf.keras.Model:
-        """Build Keras model for ReduceMax operation."""
+        """Build Keras model for ReduceMin operation."""
         input_shape = self.desc['input_shape']
         inputs = tf.keras.Input(shape=input_shape[1:], dtype=tf.float32, name='input')
         
@@ -22,10 +22,10 @@ class OpReduceMax(OperationBase):
         axes = self.desc.get('axes', [1, 2])  # Default to spatial dimensions
         keepdims = self.desc.get('keepdims', True)
         
-        # ReduceMax operation
+        # ReduceMin operation
         x = tf.keras.layers.Lambda(
-            lambda x: tf.reduce_max(x, axis=axes, keepdims=keepdims),
-            name='reduce_max'
+            lambda x: tf.reduce_min(x, axis=axes, keepdims=keepdims),
+            name='reduce_min'
         )(inputs)
         
         model = tf.keras.Model(inputs=inputs, outputs=x)
@@ -72,3 +72,4 @@ class OpReduceMax(OperationBase):
         tflite_model = converter.convert()
         with open(out_path, 'wb') as f:
             f.write(tflite_model)
+
