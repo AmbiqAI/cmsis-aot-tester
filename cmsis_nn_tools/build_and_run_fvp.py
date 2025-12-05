@@ -622,7 +622,7 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--generator", help="CMake generator (e.g. Ninja)")
     ap.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4, help="Parallel build jobs")
     ap.add_argument("--timeout-run", type=float, default=0.0, help="Per-test timeout in seconds (0 = none)")
-    ap.add_argument("--fail-fast", action=argparse.BooleanOptionalAction, default=True, help="Stop on first failure")
+    ap.add_argument("--fail-fast", action=argparse.BooleanOptionalAction, default=False, help="Stop on first failure")
     ap.add_argument("--fvp-arg", action="append", default=[], help="Extra args to pass to the FVP (repeatable)")
     
     # Reporting options
