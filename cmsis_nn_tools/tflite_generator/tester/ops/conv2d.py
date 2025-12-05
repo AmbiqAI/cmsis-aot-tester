@@ -14,62 +14,52 @@ class OpConv2D(OperationBase):
     """
     
     def build_keras_model(self) -> tf.keras.Model:
-        """Build Keras model for Conv2D operation."""
         input_shape = self.desc['input_shape']
         filter_shape = self.desc['filter_shape']
         
-        inputs = tf.keras.Input(shape=input_shape[1:], dtype=tf.float32, name='input')
+        tf.keras.utils.set_random_seed(17)
         
         padding = self.desc.get('padding', 'valid')
         if padding is not None:
             padding = str(padding).lower()
         else:
             padding = 'valid'
-
-        conv_kwargs = {
-            'filters': filter_shape[3],
-            'kernel_size': filter_shape[0:2],
-            'strides': self.desc.get('strides', [1, 1]),
-            'padding': padding,
-            'use_bias': self.desc.get('use_bias', True),
-            'name': 'conv2d'
-        }
-        
-        if 'dilation' in self.desc:
-            dilation = self.desc['dilation']
-            if isinstance(dilation, (int, float)):
-                dilation = [int(dilation), int(dilation)]
-            elif isinstance(dilation, (list, tuple)):
-                if len(dilation) != 2:
-                    raise ValueError(f"Invalid dilation: {dilation}. Must be 2 integers or a single integer")
-                dilation = [int(dilation[0]), int(dilation[1])]
-            else:
-                raise ValueError(f"Invalid dilation type: {type(dilation)}. Must be int or list/tuple of 2 ints")
-            
-            if any(d <= 0 for d in dilation):
-                raise ValueError(f"Invalid dilation values: {dilation}. Must be positive integers")
-            
-            conv_kwargs['dilation_rate'] = tuple(dilation)
-        
-        if conv_kwargs['use_bias']:
-            conv_kwargs['bias_initializer'] = tf.keras.initializers.RandomUniform(minval=-1.0, maxval=1.0)
-        
-        conv = tf.keras.layers.Conv2D(**conv_kwargs)
-        x = conv(inputs)
         
         activation = self.desc.get('activation', 'NONE')
-        if activation == 'RELU':
-            x = tf.keras.layers.ReLU()(x)
-        elif activation == 'RELU6':
-            x = tf.keras.layers.ReLU(max_value=6)(x)
-        elif activation == 'TANH':
-            x = tf.keras.layers.Activation('tanh')(x)
-        elif activation == 'SIGMOID':
-            x = tf.keras.layers.Activation('sigmoid')(x)
-        elif activation != 'NONE':
-            raise ValueError(f"Unsupported activation: {activation}")
-            
-        model = tf.keras.Model(inputs=inputs, outputs=x)
+        act = None if activation in (None, 'NONE', 'none') else activation.lower()
+        
+        dilation = self.desc.get('dilation', [1, 1])
+        if isinstance(dilation, (int, float)):
+            dilation = [int(dilation), int(dilation)]
+        elif isinstance(dilation, (list, tuple)):
+            if len(dilation) != 2:
+                raise ValueError(f"Invalid dilation: {dilation}. Must be 2 integers or a single integer")
+            dilation = [int(dilation[0]), int(dilation[1])]
+        
+        if any(d <= 0 for d in dilation):
+            raise ValueError(f"Invalid dilation values: {dilation}. Must be positive integers")
+        
+        x = tf.keras.Input(
+            shape=input_shape[1:],
+            batch_size=input_shape[0] if len(input_shape) > 0 else None,
+            dtype=tf.float32,
+            name='input'
+        )
+        
+        conv = tf.keras.layers.Conv2D(
+            filters=filter_shape[3],
+            kernel_size=tuple(filter_shape[0:2]),
+            strides=tuple(self.desc.get('strides', [1, 1])),
+            dilation_rate=tuple(dilation),
+            padding=padding,
+            use_bias=self.desc.get('use_bias', True),
+            activation=act,
+            kernel_initializer=tf.keras.initializers.GlorotUniform(seed=1234),
+            bias_initializer='zeros',
+            name='conv_2d'
+        )(x)
+        
+        model = tf.keras.Model(inputs=[x], outputs=conv, name='conv_2d')
         return model
 
     def convert_to_tflite(self, model, out_path: str, rep_seed: int) -> None:
@@ -91,13 +81,14 @@ class OpConv2D(OperationBase):
             converter.target_spec.supported_types = [tf.int16]
         
         def representative_data_gen():
+            rep_rng = np.random.default_rng(42)
             for _ in range(100):
                 if 'input_shape' in self.desc:
-                    inputs = self.rng.uniform(-1.0, 1.0, size=self.desc['input_shape']).astype(np.float32)
+                    inputs = rep_rng.integers(-32, 32, size=self.desc['input_shape']).astype(np.float32)
                     yield [inputs]
                 elif 'input_1_shape' in self.desc and 'input_2_shape' in self.desc:
-                    inputs1 = self.rng.uniform(-1.0, 1.0, size=self.desc['input_1_shape']).astype(np.float32)
-                    inputs2 = self.rng.uniform(-1.0, 1.0, size=self.desc['input_2_shape']).astype(np.float32)
+                    inputs1 = rep_rng.integers(-32, 32, size=self.desc['input_1_shape']).astype(np.float32)
+                    inputs2 = rep_rng.integers(-32, 32, size=self.desc['input_2_shape']).astype(np.float32)
                     yield [inputs1, inputs2]
         
         converter.representative_dataset = representative_data_gen
