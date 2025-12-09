@@ -1,5 +1,5 @@
-operator: Add
-name: add_s8
+operator: Mul
+name: mul_s8
 activation_dtype: S8
 weight_dtype: S8
 activation: NONE
@@ -7,17 +7,17 @@ hint:
   call_style: per_tensor
 input_1_shape:
 - 1
-- 4
+- 5
 - 4
 - 8
 input_2_shape:
 - 1
-- 4
+- 5
 - 4
 - 8
 ---
-operator: Add
-name: add_s16_s16
+operator: Mul
+name: mul_s16_s16
 activation_dtype: S16
 weight_dtype: S8
 activation: NONE
@@ -26,16 +26,16 @@ hint:
 input_1_shape:
 - 1
 - 4
-- 4
+- 5
 - 8
 input_2_shape:
 - 1
 - 4
-- 4
+- 5
 - 8
 ---
-operator: Add
-name: add_s16_spill_s16
+operator: Mul
+name: mul_s16_spill_s16
 activation_dtype: S16
 weight_dtype: S8
 activation: NONE
@@ -43,11 +43,11 @@ hint:
   call_style: per_tensor
 input_1_shape:
 - 1
-- 3
+- 7
 - 5
 - 7
 input_2_shape:
 - 1
-- 3
+- 7
 - 5
 - 7

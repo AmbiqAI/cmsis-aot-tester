@@ -37,18 +37,18 @@ class ColoredFormatter(logging.Formatter):
 
 def setup_logger(
     name: str = "cmsis_nn_tools",
-    level: int = logging.INFO,
+    level: Optional[int] = None,
     log_file: Optional[Path] = None,
-    verbose: bool = False
+    verbosity: int = 0
 ) -> logging.Logger:
     """
     Set up logger for CMSIS-NN Tools.
     
     Args:
         name: Logger name
-        level: Logging level
+        level: Logging level (overrides verbosity if provided)
         log_file: Optional log file path
-        verbose: Enable verbose logging
+        verbosity: Verbosity level (0=minimal, 1=progress, 2=commands, 3=debug)
         
     Returns:
         Configured logger
@@ -58,11 +58,18 @@ def setup_logger(
     # Clear existing handlers
     logger.handlers.clear()
     
-    # Set level
-    if verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(level)
+    # Map verbosity to logging level
+    if level is None:
+        if verbosity == 0:
+            level = logging.WARNING  # Only errors/warnings
+        elif verbosity == 1:
+            level = logging.INFO  # Progress messages
+        elif verbosity == 2:
+            level = logging.INFO  # Commands and progress
+        else:  # verbosity == 3
+            level = logging.DEBUG  # All messages
+    
+    logger.setLevel(level)
     
     # Console handler with colors
     console_handler = logging.StreamHandler(sys.stdout)

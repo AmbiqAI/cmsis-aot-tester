@@ -46,7 +46,8 @@ class FullTestPipeline:
         Returns:
             True if all steps succeeded, False otherwise
         """
-        self.logger.info("Starting CMSIS-NN Full Test Pipeline")
+        if self.config.verbosity >= 1:
+            self.logger.info("Starting CMSIS-NN Full Test Pipeline")
         
         if self.config.dry_run:
             self.logger.warning("DRY RUN MODE - No actual changes will be made")
@@ -63,7 +64,8 @@ class FullTestPipeline:
                         self.logger.error("Stopping due to failure in TFLite generation")
                         return False
             else:
-                self.logger.info("Skipping TFLite model generation")
+                if self.config.verbosity >= 1:
+                    self.logger.info("Skipping TFLite model generation")
             
             if not self.config.skip_conversion and overall_success:
                 success = self._step2_convert_tflite_models()
@@ -73,7 +75,8 @@ class FullTestPipeline:
                         self.logger.error("Stopping due to failure in TFLite conversion")
                         return False
             else:
-                self.logger.info("Skipping TFLite to C conversion")
+                if self.config.verbosity >= 1:
+                    self.logger.info("Skipping TFLite to C conversion")
             
             if not self.config.skip_runners and overall_success:
                 success = self._step3_generate_test_runners()
@@ -83,7 +86,8 @@ class FullTestPipeline:
                         self.logger.error("Stopping due to failure in test runner generation")
                         return False
             else:
-                self.logger.info("Skipping test runner generation")
+                if self.config.verbosity >= 1:
+                    self.logger.info("Skipping test runner generation")
             
             if not self.config.skip_runners and overall_success and not self.config.skip_conversion:
                 success = self._step3_5_generate_test_runners_after_conversion()
@@ -101,20 +105,23 @@ class FullTestPipeline:
                         self.logger.error("Stopping due to failure in FVP build")
                         return False
             else:
-                self.logger.info("Skipping FVP build")
+                if self.config.verbosity >= 1:
+                    self.logger.info("Skipping FVP build")
             
             if not self.config.skip_run and overall_success:
                 success = self._step5_run_tests()
                 if not success:
                     overall_success = False
             else:
-                self.logger.info("Skipping FVP test execution")
+                if self.config.verbosity >= 1:
+                    self.logger.info("Skipping FVP test execution")
             
             end_time = time.time()
             duration = end_time - start_time
             
             if overall_success:
-                self.logger.info(f"Pipeline completed successfully in {duration:.1f} seconds")
+                if self.config.verbosity >= 1:
+                    self.logger.info(f"Pipeline completed successfully in {duration:.1f} seconds")
                 return True
             else:
                 self.logger.error(f"Pipeline failed after {duration:.1f} seconds")
@@ -126,8 +133,10 @@ class FullTestPipeline:
     
     def _step1_generate_tflite_models(self) -> bool:
         """Step 1: Generate TFLite models."""
-        self.logger.info("Step 1/5: Generate TFLite Models")
-        self.logger.info("Generating TensorFlow Lite models using pytest in tflite generator")
+        if self.config.verbosity >= 1:
+            self.logger.info("Step 1/5: Generate TFLite Models")
+        if self.config.verbosity >= 1:
+            self.logger.info("Generating TensorFlow Lite models using pytest in tflite generator")
         
         if not self.config.tflite_generator_dir.exists():
             self.logger.error(f"tflite generator directory not found: {self.config.tflite_generator_dir.absolute()}")
@@ -139,12 +148,17 @@ class FullTestPipeline:
             cmd.extend(["--op", self.config.op_filter])
         if self.config.dtype_filter:
             cmd.extend(["--dtype", self.config.dtype_filter])
+        if self.config.name_filter:
+            cmd.extend(["--name", self.config.name_filter])
         if self.config.limit:
             cmd.extend(["--limit", str(self.config.limit)])
         
         try:
-            run_command(cmd, cwd=self.config.tflite_generator_dir, verbose=self.config.verbose)
-            self.logger.info("TFLite models generated successfully")
+            if self.config.verbosity >= 2:
+                self.logger.info(f"Running command: {' '.join(cmd)}")
+            run_command(cmd, cwd=self.config.tflite_generator_dir, verbosity=self.config.verbosity)
+            if self.config.verbosity >= 1:
+                self.logger.info("TFLite models generated successfully")
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             self.logger.error(f"Failed to generate TFLite models: {e}")
@@ -152,8 +166,10 @@ class FullTestPipeline:
     
     def _step2_convert_tflite_models(self) -> bool:
         """Step 2: Convert TFLite models to C modules."""
-        self.logger.info("Step 2/5: Convert TFLite to C Modules")
-        self.logger.info("Converting TensorFlow Lite models to standalone C inference modules")
+        if self.config.verbosity >= 1:
+            self.logger.info("Step 2/5: Convert TFLite to C Modules")
+        if self.config.verbosity >= 1:
+            self.logger.info("Converting TensorFlow Lite models to standalone C inference modules")
         
         if not self.config.generated_tests_dir.exists():
             self.logger.error(f"Generated tests directory not found: {self.config.generated_tests_dir}")
@@ -164,16 +180,20 @@ class FullTestPipeline:
             self.logger.error(f"No TFLite files found in {self.config.generated_tests_dir}")
             return False
         
-        self.logger.info(f"Found {len(tflite_files)} TFLite files to convert")
+        if self.config.verbosity >= 1:
+            self.logger.info(f"Found {len(tflite_files)} TFLite files to convert")
         
         if self.config.dry_run:
-            self.logger.info("Dry run mode - would convert the following files:")
+            if self.config.verbosity >= 1:
+                self.logger.info("Dry run mode - would convert the following files:")
             for tflite_file in tflite_files:
-                self.logger.info(f"  - {tflite_file}")
+                if self.config.verbosity >= 1:
+                    self.logger.info(f"  - {tflite_file}")
             return True
 
         platform_name = self._get_platform_name(self.config.cpu)
-        self.logger.info(f"Using platform: {platform_name} for CPU: {self.config.cpu}")
+        if self.config.verbosity >= 1:
+            self.logger.info(f"Using platform: {platform_name} for CPU: {self.config.cpu}")
     
         success_count = 0
         for tflite_file in tflite_files:
@@ -190,15 +210,18 @@ class FullTestPipeline:
                 "--module.name", module_name,
                 "--module.prefix", module_name,
                 "--platform.name",  platform_name,
-                "--test.enabled",    
             ]
             
+            # Only add --test.enabled when verbosity is 3
+            if self.config.verbosity >= 3:
+                cmd.append("--test.enabled")
+            
             try:
-                if self.config.verbose:
-                    run_command(cmd, verbose=True, cwd=helia_aot_path)
-                else:
-                    run_command(cmd, capture_output=True, cwd=helia_aot_path)
-                self.logger.info(f"Converted: {module_name}")
+                if self.config.verbosity >= 2:
+                    self.logger.info(f"Running command: {' '.join(cmd)}")
+                run_command(cmd, capture_output=(self.config.verbosity < 2), cwd=helia_aot_path, verbosity=self.config.verbosity)
+                if self.config.verbosity >= 1:
+                    self.logger.info(f"Converted: {module_name}")
                 success_count += 1
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 self.logger.error(f"Failed to convert {module_name}: {e}")
@@ -208,13 +231,16 @@ class FullTestPipeline:
             self.logger.error("No TFLite files were successfully converted")
             return False
         
-        self.logger.info(f"Successfully converted {success_count}/{len(tflite_files)} TFLite files")
+        if self.config.verbosity >= 1:
+            self.logger.info(f"Successfully converted {success_count}/{len(tflite_files)} TFLite files")
         return True
     
     def _step3_generate_test_runners(self) -> bool:
         """Step 3: Generate Unity test runners."""
-        self.logger.info("Step 3/5: Generate Test Runners")
-        self.logger.info("Generating Unity test runners for all test directories")
+        if self.config.verbosity >= 1:
+            self.logger.info("Step 3/5: Generate Test Runners")
+        if self.config.verbosity >= 1:
+            self.logger.info("Generating Unity test runners for all test directories")
         
         script_path = self.config.project_root / "cmsis_nn_tools" / "scripts" / "generate_test_runners.py"
         if not script_path.exists():
@@ -224,18 +250,20 @@ class FullTestPipeline:
         model_headers = list(self.config.generated_tests_dir.rglob("includes-api/*_model.h"))
         if not model_headers:
             self.logger.warning("No model headers found - test runners will be generated after TFLite conversion")
-            self.logger.info("This step will be skipped for now and run after conversion")
+            if self.config.verbosity >= 1:
+                self.logger.info("This step will be skipped for now and run after conversion")
             return True
         
         cmd = ["python3", str(script_path), "--root", str(self.config.generated_tests_dir)]
-        if self.config.verbose:
-            cmd.append("--verbose")
         if self.config.dry_run:
             cmd.append("--dry-run")
         
         try:
-            run_command(cmd, verbose=self.config.verbose)
-            self.logger.info("Test runners generated successfully")
+            if self.config.verbosity >= 2:
+                self.logger.info(f"Running command: {' '.join(cmd)}")
+            run_command(cmd, verbosity=self.config.verbosity)
+            if self.config.verbosity >= 1:
+                self.logger.info("Test runners generated successfully")
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             self.logger.error(f"Failed to generate test runners: {e}")
@@ -251,10 +279,12 @@ class FullTestPipeline:
     
     def _step4_build_fvp(self) -> bool:
         """Step 4: Build for FVP."""
-        self.logger.info("Step 4/5: Build for FVP")
+        if self.config.verbosity >= 1:
+            self.logger.info("Step 4/5: Build for FVP")
         
         if self.config.dry_run:
-            self.logger.info("Dry run mode - would build for FVP")
+            if self.config.verbosity >= 1:
+                self.logger.info("Dry run mode - would build for FVP")
             return True
         
         script_path = self.config.project_root / "cmsis_nn_tools" / "build_and_run_fvp.py"
@@ -271,12 +301,16 @@ class FullTestPipeline:
         
         if self.config.jobs:
             cmd.extend(["--jobs", str(self.config.jobs)])
-        if not self.config.build_verbose:
+        # Map verbosity to quiet: verbosity 0-1 = quiet, 2-3 = not quiet
+        if self.config.verbosity <= 1:
             cmd.append("--quiet")
         
         try:
-            run_command(cmd, verbose=self.config.verbose)
-            self.logger.info(f"Successfully built for {self.config.cpu}")
+            if self.config.verbosity >= 2:
+                self.logger.info(f"Running command: {' '.join(cmd)}")
+            run_command(cmd, verbosity=self.config.verbosity)
+            if self.config.verbosity >= 1:
+                self.logger.info(f"Successfully built for {self.config.cpu}")
             return True
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Failed to build for FVP (exit code {e.returncode})")
@@ -300,10 +334,12 @@ class FullTestPipeline:
     
     def _step5_run_tests(self) -> bool:
         """Step 5: Run tests on FVP."""
-        self.logger.info("Step 5/5: Run Tests on FVP")
+        if self.config.verbosity >= 1:
+            self.logger.info("Step 5/5: Run Tests on FVP")
         
         if self.config.dry_run:
-            self.logger.info("Dry run mode - would run tests on FVP")
+            if self.config.verbosity >= 1:
+                self.logger.info("Dry run mode - would run tests on FVP")
             return True
         
         script_path = self.config.project_root / "cmsis_nn_tools" / "build_and_run_fvp.py"
@@ -322,6 +358,9 @@ class FullTestPipeline:
         if not self.config.fail_fast:
             cmd.append("--no-fail-fast")
         
+        # Pass verbosity to build_and_run_fvp.py
+        cmd.extend(["--verbosity", str(self.config.verbosity)])
+        
         if hasattr(self.config, 'enable_reporting'):
             if not self.config.enable_reporting:
                 cmd.append("--no-report")
@@ -331,8 +370,12 @@ class FullTestPipeline:
                 cmd.extend(["--report-dir", str(self.config.report_dir)])
         
         try:
-            self.logger.info("Running tests on FVP (real-time output):")
-            self.logger.info("=" * 60)
+            if self.config.verbosity >= 1:
+                self.logger.info("Running tests on FVP")
+            if self.config.verbosity >= 2:
+                self.logger.info(f"Running command: {' '.join(cmd)}")
+            if self.config.verbosity >= 2:
+                self.logger.info("=" * 60)
             
             subprocess.run(
                 cmd,
@@ -342,11 +385,14 @@ class FullTestPipeline:
                 universal_newlines=True
             )
             
-            self.logger.info("=" * 60)
-            self.logger.info("All tests completed successfully")
+            if self.config.verbosity >= 2:
+                self.logger.info("=" * 60)
+            if self.config.verbosity >= 1:
+                self.logger.info("All tests completed successfully")
             return True
         except subprocess.CalledProcessError as e:
-            self.logger.error("=" * 60)
+            if self.config.verbosity >= 2:
+                self.logger.error("=" * 60)
             self.logger.error(f"Some tests failed (exit code: {e.returncode})")
             return False
         except FileNotFoundError as e:

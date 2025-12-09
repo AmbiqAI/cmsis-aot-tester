@@ -46,7 +46,7 @@ Examples:
   cmsis-nn-tools --dry-run
 
   # Verbose output with custom CPU
-  cmsis-nn-tools --cpu cortex-m3 --verbose
+  cmsis-nn-tools --cpu cortex-m3 --verbosity 2
         """
     )
     
@@ -67,6 +67,8 @@ Examples:
                        help="Generate only specific operator (e.g., 'Conv2D')")
     parser.add_argument("--dtype", type=str, default=None,
                        help="Generate only specific dtype (e.g., 'S8', 'S16')")
+    parser.add_argument("--name", type=str, default=None,
+                       help="Generate only specific test by name")
     parser.add_argument("--limit", type=int, default=None,
                        help="Limit number of models to generate")
     
@@ -77,8 +79,6 @@ Examples:
                        help="Optimization level (default: -Ofast)")
     parser.add_argument("--jobs", type=int, default=None,
                        help="Parallel build jobs (default: auto)")
-    parser.add_argument("--quiet-build", action="store_true",
-                       help="Reduce FVP build verbosity (default: full verbosity)")
     
     # Run options
     parser.add_argument("--timeout", type=float, default=0.0,
@@ -100,12 +100,10 @@ Examples:
     # General options
     parser.add_argument("--setup", action="store_true",
                        help="Initialize git submodules and install Python dependencies")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                       help="Show detailed output")
+    parser.add_argument("--verbosity", "-v", type=int, choices=[0, 1, 2, 3], default=0,
+                       help="Output verbosity level (0=minimal, 1=progress, 2=commands, 3=debug)")
     parser.add_argument("--dry-run", action="store_true",
                        help="Show what would be done without actually doing it")
-    parser.add_argument("--quiet", "-q", action="store_true",
-                       help="Reduce output verbosity")
     parser.add_argument("--log-file", type=Path,
                        help="Log file path")
     
@@ -180,11 +178,11 @@ def main() -> int:
     config.jobs = args.jobs
     config.timeout = args.timeout
     config.fail_fast = not args.no_fail_fast
-    config.verbose = args.verbose and not args.quiet
-    config.build_verbose = not args.quiet_build  # Default: True (full verbosity)
+    config.verbosity = args.verbosity
     config.dry_run = args.dry_run
     config.op_filter = args.op
     config.dtype_filter = args.dtype
+    config.name_filter = args.name
     config.limit = args.limit
     config.skip_generation = args.skip_generation
     config.skip_conversion = args.skip_conversion
@@ -233,9 +231,8 @@ def main() -> int:
     
     # Setup logging
     logger = setup_logger(
-        level=20 if args.quiet else 10,  # WARNING if quiet, INFO otherwise
         log_file=args.log_file,
-        verbose=config.verbose
+        verbosity=config.verbosity
     )
     
     # Create and run pipeline

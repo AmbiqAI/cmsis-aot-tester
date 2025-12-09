@@ -161,7 +161,7 @@ def detect_paths(args) -> dict:
 
 def cmake_configure(source_dir: Path, build_dir: Path, toolchain_file: Path, cpu: str,
                     cmsis5: Path, optimization: str, extra_defs: List[str], generator: Optional[str],
-                    quiet: bool, env: dict) -> None:
+                    verbosity: int, env: dict) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     
     cmake_cache = build_dir / "CMakeCache.txt"
@@ -180,20 +180,22 @@ def cmake_configure(source_dir: Path, build_dir: Path, toolchain_file: Path, cpu
     
     if generator:
         cmd += ["-G", generator]
-    print(f"Configure: {' '.join(cmd)}")
-    stdout = subprocess.DEVNULL if quiet else None
+    if verbosity >= 2:
+        print(f"Configure: {' '.join(cmd)}")
+    stdout = subprocess.DEVNULL if verbosity <= 1 else None
     rc = subprocess.call(cmd, cwd=str(REPO_ROOT), env=env, stdout=stdout, stderr=None)
     if rc != 0:
         die(f"CMake configure failed for {cpu} (rc={rc})")
 
 
-def cmake_build(build_dir: Path, quiet: bool, env: dict, jobs: Optional[int]) -> None:
+def cmake_build(build_dir: Path, verbosity: int, env: dict, jobs: Optional[int]) -> None:
     cmd = ["cmake", "--build", str(build_dir)]
     if jobs and jobs > 0:
         # Pass through to the underlying build tool (works for Make/Ninja)
         cmd += ["--", f"-j{jobs}"]
-    print(f"Build: {' '.join(cmd)}")
-    stdout = subprocess.DEVNULL if quiet else None
+    if verbosity >= 2:
+        print(f"Build: {' '.join(cmd)}")
+    stdout = subprocess.DEVNULL if verbosity <= 1 else None
     rc = subprocess.call(cmd, cwd=str(REPO_ROOT), env=env, stdout=stdout, stderr=None)
     if rc != 0:
         die(f"CMake build failed (rc={rc})")
@@ -208,7 +210,7 @@ def find_elves(build_dir: Path) -> List[Path]:
     return [p for p in build_dir.rglob("*.elf") if p.is_file()]
 
 
-def run_fvp_with_reporting(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: List[str], env: dict, cpu: str, descriptor_name: Optional[str] = None) -> TestResult:
+def run_fvp_with_reporting(fvp_exe: Path, elf: Path, timeout: float, verbosity: int, extra_args: List[str], env: dict, cpu: str, descriptor_name: Optional[str] = None) -> TestResult:
     """
     Run FVP with comprehensive result reporting.
     
@@ -227,7 +229,8 @@ def run_fvp_with_reporting(fvp_exe: Path, elf: Path, timeout: float, quiet: bool
         "-C", "mps3_board.uart0.unbuffered_output=1",
     ] + extra_args + [str(elf)]
     
-    print(f"Run: {' '.join(args)}")
+    if verbosity >= 2:
+        print(f"Run: {' '.join(args)}")
     
     try:
         proc = subprocess.run(
@@ -286,34 +289,66 @@ def run_fvp_with_reporting(fvp_exe: Path, elf: Path, timeout: float, quiet: bool
     # Parse the output to create TestResult
     result = parser.parse_fvp_output(output, elf, cpu, duration, exit_code, descriptor_name=descriptor_name)
     
-    # Display results (maintain existing behavior)
+    # Display results based on verbosity
     if result.status == TestStatus.PASS:
-        if not quiet:
+        # Level 0: Only test name and pass/fail
+        print(f"PASS: {elf}")
+        if verbosity >= 3:
             sys.stdout.write(output)
             sys.stdout.flush()
-        print(f"PASS: {elf}")
+        elif verbosity >= 1:
+            # Level 1: Add summary
+            pass  # Already printed PASS
     else:
-        # Show failure details even in quiet mode
+        # Always show failures
         print(f"FAIL: {elf}")
-        print("=" * 60)
-        print("FAILURE DETAILS:")
-        print("=" * 60)
-        
-        if result.failure_reason:
-            print(f"Reason: {result.failure_reason}")
-            print()
-        
-        # Show relevant output lines
-        for line in result.output_lines[:20]:  # Limit output
-            print(line)
-        if len(result.output_lines) > 20:
-            print("... (truncated)")
-        print("=" * 60)
+        if verbosity >= 1:
+            print("=" * 60)
+            print("FAILURE DETAILS:")
+            print("=" * 60)
+            
+            if result.failure_reason:
+                print(f"Reason: {result.failure_reason}")
+                print()
+            
+            # Show output differences based on verbosity
+            if verbosity >= 2:
+                # Level 2+: Show expected vs actual output
+                if result.expected_output or result.actual_output:
+                    print("OUTPUT COMPARISON:")
+                    if result.expected_output:
+                        print(f"  Expected (Golden): {result.expected_output}")
+                    if result.actual_output:
+                        print(f"  Actual (Got):     {result.actual_output}")
+                    print()
+                
+                # Show detailed differences
+                if result.output_differences:
+                    print("DETAILED DIFFERENCES:")
+                    max_diffs = 20 if verbosity < 3 else len(result.output_differences)
+                    for diff in result.output_differences[:max_diffs]:
+                        print(f"  {diff}")
+                    if len(result.output_differences) > max_diffs:
+                        print(f"  ... ({len(result.output_differences) - max_diffs} more differences)")
+                    print()
+            
+            # Show relevant output lines
+            max_lines = 20 if verbosity < 3 else len(result.output_lines)
+            if result.output_lines:
+                print("TEST OUTPUT:")
+                for line in result.output_lines[:max_lines]:
+                    print(f"  {line}")
+                if len(result.output_lines) > max_lines and verbosity < 3:
+                    print("  ... (truncated)")
+                print()
+            
+            if verbosity >= 1:
+                print("=" * 60)
     
     return result
 
 
-def run_fvp(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: List[str], env: dict) -> bool:
+def run_fvp(fvp_exe: Path, elf: Path, timeout: float, verbosity: int, extra_args: List[str], env: dict) -> bool:
     args = [
         str(fvp_exe),
         "-C", "mps3_board.uart0.shutdown_on_eot=1",
@@ -322,7 +357,8 @@ def run_fvp(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: L
         "-C", "mps3_board.uart0.out_file=-",
         "-C", "mps3_board.uart0.unbuffered_output=1",
     ] + extra_args + [str(elf)]
-    print(f"Run: {' '.join(args)}")
+    if verbosity >= 2:
+        print(f"Run: {' '.join(args)}")
     try:
         proc = subprocess.run(
             args,
@@ -341,11 +377,12 @@ def run_fvp(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: L
     success = ("0 Failures" in out)
     
     if not success:
-        # Show failure details even in quiet mode
+        # Always show failures
         print(f"FAIL: {elf}")
-        print("=" * 60)
-        print("FAILURE DETAILS:")
-        print("=" * 60)
+        if verbosity >= 1:
+            print("=" * 60)
+            print("FAILURE DETAILS:")
+            print("=" * 60)
         # Extract relevant failure information
         lines = out.split('\n')
         failure_lines = []
@@ -365,16 +402,21 @@ def run_fvp(fvp_exe: Path, elf: Path, timeout: float, quiet: bool, extra_args: L
                 failure_lines.append("... (truncated)")
                 break
         
-        if failure_lines:
-            for line in failure_lines:
-                print(line)
-        else:
-            # If no specific failure lines found, show last 20 lines
-            print("Last 20 lines of output:")
-            for line in lines[-20:]:
-                print(line)
-        print("=" * 60)
-    elif not quiet:
+        if verbosity >= 1:
+            max_lines = 20 if verbosity < 3 else len(failure_lines)
+            if failure_lines:
+                for line in failure_lines[:max_lines]:
+                    print(line)
+                if len(failure_lines) > max_lines and verbosity < 3:
+                    print("... (truncated)")
+            else:
+                # If no specific failure lines found, show last 20 lines
+                if verbosity >= 2:
+                    print("Last 20 lines of output:")
+                    for line in lines[-20:]:
+                        print(line)
+            print("=" * 60)
+    elif verbosity >= 1:
         sys.stdout.write(out)
         sys.stdout.flush()
     
@@ -425,8 +467,12 @@ def run_tests_with_reporting(cpus: List[str],
     tracker = DescriptorTracker(descriptors_dir)
     all_descriptors_dict = tracker.load_all_descriptors()
     
+    # Get verbosity from args (default to 0 if not provided)
+    verbosity = getattr(args, 'verbosity', 0)
+    
     for cpu in cpus:
-        print(f"\nTarget: {cpu} (gcc)")
+        if verbosity >= 1:
+            print(f"\nTarget: {cpu} (gcc)")
         build_dir = source_dir / f"build-{cpu}-gcc"
         
         if not args.no_build:
@@ -440,17 +486,18 @@ def run_tests_with_reporting(cpus: List[str],
                 optimization=args.opt,
                 extra_defs=args.cmake_def,
                 generator=args.generator,
-                quiet=args.quiet,
+                verbosity=verbosity,
                 env=env,
             )
-            cmake_build(build_dir=build_dir, quiet=args.quiet, env=env, jobs=args.jobs)
+            cmake_build(build_dir=build_dir, verbosity=verbosity, env=env, jobs=args.jobs)
         
         if args.no_run:
             continue
         
         elves = find_elves(build_dir)
         if not elves:
-            print(f"(no .elf found under {build_dir}, nothing to run)")
+            if verbosity >= 1:
+                print(f"(no .elf found under {build_dir}, nothing to run)")
             continue
         
         # Run tests for this CPU
@@ -465,7 +512,7 @@ def run_tests_with_reporting(cpus: List[str],
                 fvp_exe=fvp_exe, 
                 elf=elf, 
                 timeout=args.timeout_run,
-                quiet=args.quiet, 
+                verbosity=verbosity, 
                 extra_args=args.fvp_arg, 
                 env=env,
                 cpu=cpu,
@@ -477,7 +524,8 @@ def run_tests_with_reporting(cpus: List[str],
             if result.status != TestStatus.PASS:
                 any_fail = True
                 if args.fail_fast:
-                    print("Stopping early due to failure (--fail-fast).")
+                    if verbosity >= 1:
+                        print("Stopping early due to failure (--fail-fast).")
                     break
         
         if any_fail and args.fail_fast:
@@ -596,8 +644,10 @@ def run_tests_with_reporting(cpus: List[str],
     # Generate reports in requested formats (defaults to JSON if none specified)
     report_formats = getattr(args, 'report_formats', None) or ["json"]
     generated_files = generator.generate_reports(report, report_formats)
-    for format_type, file_path in generated_files.items():
-        print(f"{format_type.upper()} report generated: {file_path}")
+    verbosity = getattr(args, 'verbosity', 0)
+    if verbosity >= 1:
+        for format_type, file_path in generated_files.items():
+            print(f"{format_type.upper()} report generated: {file_path}")
     
     return all_results, not any_fail
 
@@ -606,7 +656,8 @@ def main(argv: List[str]) -> int:
     ap = argparse.ArgumentParser(description="Build and run CMSIS-NN UnitTests on FVP Corstone-300 (Python).")
     ap.add_argument("-c", "--cpu", default="cortex-m55", help="Comma-separated cores, e.g. cortex-m3,cortex-m55")
     ap.add_argument("-o", "--opt", default="-Ofast", help="Optimization level passed via CMSIS_OPTIMIZATION_LEVEL")
-    ap.add_argument("-q", "--quiet", action="store_true", help="Reduce build and run verbosity")
+    ap.add_argument("--verbosity", type=int, choices=[0, 1, 2, 3], default=0,
+                   help="Output verbosity level (0=minimal, 1=progress, 2=commands, 3=debug)")
     ap.add_argument("-b", "--no-build", action="store_true", help="Skip build (only run)")
     ap.add_argument("-r", "--no-run", action="store_true", help="Skip run (only build)")
     ap.add_argument("-e", "--no-setup", action="store_true", help="Skip dependency setup")
@@ -622,7 +673,7 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--generator", help="CMake generator (e.g. Ninja)")
     ap.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4, help="Parallel build jobs")
     ap.add_argument("--timeout-run", type=float, default=0.0, help="Per-test timeout in seconds (0 = none)")
-    ap.add_argument("--fail-fast", action=argparse.BooleanOptionalAction, default=True, help="Stop on first failure")
+    ap.add_argument("--fail-fast", action=argparse.BooleanOptionalAction, default=False, help="Stop on first failure")
     ap.add_argument("--fvp-arg", action="append", default=[], help="Extra args to pass to the FVP (repeatable)")
     
     # Reporting options
@@ -667,17 +718,21 @@ def main(argv: List[str]) -> int:
             env=env
         )
         
+        verbosity = getattr(args, 'verbosity', 0)
         if success:
-            print("\nAll requested builds/runs completed successfully.")
+            if verbosity >= 1:
+                print("\nAll requested builds/runs completed successfully.")
             return 0
         else:
             return 1
     
     # Original logic for backward compatibility
     any_fail = False
+    verbosity = getattr(args, 'verbosity', 0)
 
     for cpu in cpus:
-        print(f"\nTarget: {cpu} ({compiler_tag})")
+        if verbosity >= 1:
+            print(f"\nTarget: {cpu} ({compiler_tag})")
         build_dir = source_dir / f"build-{cpu}-{compiler_tag}"
 
         if not args.no_build:
@@ -690,34 +745,40 @@ def main(argv: List[str]) -> int:
                 optimization=args.opt,
                 extra_defs=args.cmake_def,
                 generator=args.generator,
-                quiet=args.quiet,
+                verbosity=verbosity,
                 env=env,
             )
-            cmake_build(build_dir=build_dir, quiet=args.quiet, env=env, jobs=args.jobs)
+            cmake_build(build_dir=build_dir, verbosity=verbosity, env=env, jobs=args.jobs)
 
         if args.no_run:
             continue
 
         elves = find_elves(build_dir)
         if not elves:
-            print(f"(no .elf found under {build_dir}, nothing to run)")
+            if verbosity >= 1:
+                print(f"(no .elf found under {build_dir}, nothing to run)")
             continue
 
         for elf in sorted(elves):
             ok = run_fvp(fvp_exe=fvp_exe, elf=elf, timeout=args.timeout_run,
-                          quiet=args.quiet, extra_args=args.fvp_arg, env=env)
+                          verbosity=verbosity, extra_args=args.fvp_arg, env=env)
             if not ok:
                 any_fail = True
                 if args.fail_fast:
-                    print("Stopping early due to failure (--fail-fast).")
+                    if verbosity >= 1:
+                        print("Stopping early due to failure (--fail-fast).")
                     return 1
             else:
-                print(f"PASS: {elf} \n\n")
+                print(f"PASS: {elf}")
+                if verbosity >= 1:
+                    print()
 
     if any_fail:
         return 1
 
-    print("\nAll requested builds/runs completed successfully.")
+    verbosity = getattr(args, 'verbosity', 0)
+    if verbosity >= 1:
+        print("\nAll requested builds/runs completed successfully.")
     return 0
 
 

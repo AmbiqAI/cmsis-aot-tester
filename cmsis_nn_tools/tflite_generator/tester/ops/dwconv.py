@@ -90,7 +90,11 @@ class OpDepthwiseConv2D(OperationBase):
             converter.inference_output_type = tf.int8
         elif activation_dtype == 'S16':
             converter.optimizations = [tf.lite.Optimize.DEFAULT]
-            converter.target_spec.supported_types = [tf.int16]
+            converter.target_spec.supported_ops = [
+                tf.lite.OpsSet.EXPERIMENTAL_TFLITE_BUILTINS_ACTIVATIONS_INT16_WEIGHTS_INT8
+            ]
+            converter.inference_input_type = tf.int16
+            converter.inference_output_type = tf.int16
 
         
         def representative_data_gen():
