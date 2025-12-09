@@ -7,6 +7,7 @@ import pytest
 import os
 import tempfile
 import numpy as np
+import yaml
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -176,6 +177,11 @@ def generate_test(desc: Dict[str, Any], out_dir: str) -> None:
     # Create output directory
     test_dir = Path(out_dir) / name
     test_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save the complete descriptor as YAML in the test directory
+    descriptor_path = test_dir / "descriptor.yaml"
+    with open(descriptor_path, 'w') as f:
+        yaml.dump(desc, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
     
     # Get operation class
     if operator not in OP_MAP:

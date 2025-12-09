@@ -26,8 +26,7 @@ class Config:
     # Test configuration
     timeout: float = 0.0
     fail_fast: bool = True
-    verbose: bool = False
-    build_verbose: bool = True  
+    verbosity: int = 0  # 0=minimal, 1=progress, 2=commands, 3=debug
     dry_run: bool = False
     
     # Filters
@@ -60,6 +59,10 @@ class Config:
         if isinstance(self.tflite_generator_dir, str):
             self.tflite_generator_dir = Path(self.tflite_generator_dir)
         
+        # Validate verbosity level
+        if not 0 <= self.verbosity <= 3:
+            raise ValueError(f"verbosity must be between 0 and 3, got {self.verbosity}")
+        
         # Set default jobs to CPU count
         if self.jobs is None:
             self.jobs = os.cpu_count() or 4
@@ -76,8 +79,7 @@ class Config:
             "jobs": self.jobs,
             "timeout": self.timeout,
             "fail_fast": self.fail_fast,
-            "verbose": self.verbose,
-            "build_verbose": self.build_verbose,
+            "verbosity": self.verbosity,
             "dry_run": self.dry_run,
             "op_filter": self.op_filter,
             "dtype_filter": self.dtype_filter,

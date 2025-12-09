@@ -39,6 +39,9 @@ class TestResult:
     exit_code: Optional[int] = None
     error_type: Optional[str] = None  # "assertion", "timeout", "crash", etc.
     descriptor_name: Optional[str] = None  # Link back to descriptor
+    expected_output: Optional[str] = None  # Golden reference output
+    actual_output: Optional[str] = None  # Actual test output
+    output_differences: List[str] = field(default_factory=list)  # List of difference details
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -56,7 +59,10 @@ class TestResult:
             "cycles": self.cycles,
             "exit_code": self.exit_code,
             "error_type": self.error_type,
-            "descriptor_name": self.descriptor_name
+            "descriptor_name": self.descriptor_name,
+            "expected_output": self.expected_output,
+            "actual_output": self.actual_output,
+            "output_differences": self.output_differences
         }
 
 

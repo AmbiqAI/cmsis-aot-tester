@@ -24,6 +24,12 @@ class TestResultParser:
         self.error_pattern = re.compile(r'ERROR:\s*(.+)')
         self.cycles_pattern = re.compile(r'\[PERF\]\s+(\w+):\s+(\d+)\s+cycles')
         self.memory_pattern = re.compile(r'Memory usage:\s+(\d+)\s+bytes')
+        # Patterns for extracting output differences
+        self.expected_pattern = re.compile(r'(?:Expected|Golden|Reference)[:\s]+([^\n]+)', re.IGNORECASE)
+        self.actual_pattern = re.compile(r'(?:Actual|Got|Output|Result)[:\s]+([^\n]+)', re.IGNORECASE)
+        self.difference_pattern = re.compile(r'(?:Difference|Delta|Diff)[:\s]+([^\n]+)', re.IGNORECASE)
+        self.index_pattern = re.compile(r'(?:Index|Position|Element)\s*[\[\(]?\s*(\d+)\s*[\]\)]?', re.IGNORECASE)
+        self.value_comparison_pattern = re.compile(r'(\d+)\s*[!=<>]+\s*(\d+)')
         
     def parse_fvp_output(self, 
                         output: str, 
@@ -61,6 +67,13 @@ class TestResultParser:
         
         relevant_lines = self._extract_relevant_lines(lines)
         
+        # Extract output differences if test failed
+        expected_output = None
+        actual_output = None
+        output_differences = []
+        if status == TestStatus.FAIL:
+            expected_output, actual_output, output_differences = self._extract_output_differences(output, lines)
+        
         return TestResult(
             test_name=test_name,
             status=status,
@@ -75,7 +88,10 @@ class TestResultParser:
             cycles=cycles,
             exit_code=exit_code,
             error_type=error_type,
-            descriptor_name=descriptor_name
+            descriptor_name=descriptor_name,
+            expected_output=expected_output,
+            actual_output=actual_output,
+            output_differences=output_differences
         )
     
     def _extract_test_name(self, elf_path: Path) -> str:
@@ -170,6 +186,62 @@ class TestResultParser:
                     break
         
         return relevant
+    
+    def _extract_output_differences(self, output: str, lines: List[str]) -> Tuple[Optional[str], Optional[str], List[str]]:
+        """
+        Extract expected vs actual output differences from test output.
+        
+        Returns:
+            Tuple of (expected_output, actual_output, differences_list)
+        """
+        expected = None
+        actual = None
+        differences = []
+        
+        # Look for explicit "Expected" and "Actual" patterns
+        expected_matches = self.expected_pattern.findall(output)
+        actual_matches = self.actual_pattern.findall(output)
+        
+        if expected_matches:
+            expected = expected_matches[-1].strip()
+        if actual_matches:
+            actual = actual_matches[-1].strip()
+        
+        # Look for "Expected X Was Y" patterns (already handled by failure_reason_pattern)
+        failure_matches = self.failure_reason_pattern.findall(output)
+        if failure_matches:
+            for exp, act in failure_matches:
+                differences.append(f"Expected: {exp}, Actual: {act}")
+        
+        # Look for index-based differences (e.g., "Index [0]: Expected 5, Got 3")
+        for i, line in enumerate(lines):
+            line_lower = line.lower()
+            if any(keyword in line_lower for keyword in ['expected', 'actual', 'got', 'golden', 'reference', 'difference']):
+                # Check if this line contains value comparisons
+                if self.value_comparison_pattern.search(line):
+                    differences.append(line.strip())
+                # Check if this line contains index information
+                elif self.index_pattern.search(line):
+                    differences.append(line.strip())
+                # Check if this line contains difference information
+                elif self.difference_pattern.search(line):
+                    diff_match = self.difference_pattern.search(line)
+                    if diff_match:
+                        differences.append(f"Difference: {diff_match.group(1).strip()}")
+        
+        # Look for array/tensor output differences
+        # Common patterns: "Output[0] = X (expected Y)" or "Element N: got X, expected Y"
+        array_diff_pattern = re.compile(r'(?:Output|Element|Value|Index)\s*[\[\(]?\s*(\d+)\s*[\]\)]?\s*[:=]?\s*(?:got|was|actual)?\s*(\d+)\s*(?:expected|should be|golden)?\s*(\d+)', re.IGNORECASE)
+        array_diffs = array_diff_pattern.findall(output)
+        for idx, got, exp in array_diffs:
+            differences.append(f"Index [{idx}]: Got {got}, Expected {exp}")
+        
+        # Limit differences to prevent overwhelming output
+        if len(differences) > 50:
+            differences = differences[:50]
+            differences.append("... (more differences truncated)")
+        
+        return expected, actual, differences
     
     def parse_multiple_tests(self, 
                            outputs: List[Tuple[str, Path, str, float, Optional[int]]]) -> List[TestResult]:
