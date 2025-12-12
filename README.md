@@ -1,4 +1,4 @@
-# CMSIS-NN Tools
+# Helia-Core Tester
 
 A comprehensive toolkit for CMSIS-NN testing, model generation, and FVP simulation.
 

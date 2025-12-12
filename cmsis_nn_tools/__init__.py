@@ -1,11 +1,11 @@
 """
-CMSIS-NN Tools Package
+Helia-Core Tester Package
 
-A comprehensive toolkit for CMSIS-NN testing, model generation, and FVP simulation.
+A comprehensive toolkit for Helia-Core kernels testing, model generation, and FVP simulation.
 """
 
 __version__ = "1.0.0"
-__author__ = "CMSIS-NN Tools Team"
+__author__ = "Helia-Core Tester Team"
 
 from .core.pipeline import FullTestPipeline
 

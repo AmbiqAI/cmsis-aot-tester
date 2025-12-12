@@ -116,7 +116,7 @@ class ReportGenerator:
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CMSIS-NN Descriptor Test Report - {report.cpu}</title>
+    <title>Helia-Core Tester Report - {report.cpu}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .header {{ background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
@@ -185,7 +185,7 @@ class ReportGenerator:
 </head>
 <body>
     <div class="header">
-        <h1>CMSIS-NN Descriptor Test Report</h1>
+        <h1>Helia-Core Tester Report</h1>
         <p><strong>CPU:</strong> {report.cpu}</p>
         <p><strong>Run ID:</strong> {report.run_id}</p>
         <p><strong>Start Time:</strong> {report.start_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
@@ -305,7 +305,7 @@ class ReportGenerator:
         
         total = report.total_tests
         
-        md = f"""# CMSIS-NN Descriptor Test Report
+        md = f"""# Helia-Core Tester Report
 
 ## Summary
 

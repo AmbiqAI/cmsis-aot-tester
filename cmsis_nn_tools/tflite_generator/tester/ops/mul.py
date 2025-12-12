@@ -1,5 +1,5 @@
 """
-Multiply (elementwise) operation implementation for CMSIS-NN tester.
+Multiply (elementwise) operation implementation for Helia-Core Tester.
 """
 
 from typing import Dict, Any

@@ -1,5 +1,5 @@
 """
-Configuration management for CMSIS-NN Tools.
+Configuration management for Helia-Core Tester.
 """
 
 import os
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Config:
-    """Configuration class for CMSIS-NN Tools."""
+    """Configuration class for Helia-Core Tester."""
     
     # Project paths
     project_root: Path = field(default_factory=lambda: Path(__file__).parents[2])

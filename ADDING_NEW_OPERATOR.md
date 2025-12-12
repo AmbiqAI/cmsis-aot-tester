@@ -1,6 +1,6 @@
-# Adding a New Operator to CMSIS-NN Tests
+# Adding a New Operator to Helia-Core Tester
 
-This guide explains how to add support for a new operator to the CMSIS-NN test framework. The process involves creating a YAML descriptor, implementing the operator class in the TFLite generator, and ensuring it integrates with the test pipeline.
+This guide explains how to add support for a new operator to Helia Core Tester. The process involves creating a YAML descriptor, implementing the operator class in the TFLite generator, and ensuring it integrates with the test pipeline.
 
 ## Overview
 

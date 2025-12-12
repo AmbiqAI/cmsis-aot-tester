@@ -1,4 +1,4 @@
-# Python 3.8+ requirements for CMSIS-NN testing
+# Python 3.8+ requirements for Helia-Core Tester
 # Core dependencies
 numpy>=1.20.0,<2.0.0
 tensorflow>=2.12.0,<3.0.0

@@ -61,7 +61,7 @@ The following descriptors have been generated based on the existing test cases:
 
 ## Usage
 
-These descriptors can be used with the CMSIS-NN tester to generate test harnesses for the existing test cases. Each descriptor follows the same format as the manually created descriptors in the parent directory.
+These descriptors can be used with Helia-Core Tester to generate test harnesses for the existing test cases. Each descriptor follows the same format as the manually created descriptors in the parent directory.
 
 ## Notes
 

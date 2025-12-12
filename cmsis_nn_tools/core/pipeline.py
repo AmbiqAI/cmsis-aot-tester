@@ -1,5 +1,5 @@
 """
-Main pipeline orchestration for CMSIS-NN Tools.
+Main pipeline orchestration for Helia-Core Tester.
 """
 
 import subprocess
@@ -11,7 +11,7 @@ from ..utils.command_runner import run_command
 
 
 class FullTestPipeline:
-    """Main pipeline class for CMSIS-NN testing workflow."""
+    """Main pipeline class for Helia-Core Tester workflow."""
     
     def __init__(self, config: Config):
         """
@@ -47,7 +47,7 @@ class FullTestPipeline:
             True if all steps succeeded, False otherwise
         """
         if self.config.verbosity >= 1:
-            self.logger.info("Starting CMSIS-NN Full Test Pipeline")
+            self.logger.info("Starting Helia-Core Tester Full Test Pipeline")
         
         if self.config.dry_run:
             self.logger.warning("DRY RUN MODE - No actual changes will be made")

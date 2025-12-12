@@ -1,5 +1,5 @@
 """
-Core functionality for CMSIS-NN Tools.
+Core functionality for Helia-Core Tester.
 """
 
 from .pipeline import FullTestPipeline

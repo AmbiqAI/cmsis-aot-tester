@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for CMSIS-NN tester.
+Pytest configuration and fixtures for Helia-Core Tester.
 """
 
 import pytest

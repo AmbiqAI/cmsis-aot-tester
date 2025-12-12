@@ -1,5 +1,5 @@
 """
-Pad operation implementation for CMSIS-NN tester.
+Pad operation implementation for Helia-Core Tester.
 """
 
 from typing import Dict, Any

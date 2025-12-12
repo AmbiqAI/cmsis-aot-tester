@@ -1,5 +1,5 @@
 """
-Maximum and Minimum operations implementation for CMSIS-NN tester,
+Maximum and Minimum operations implementation for Helia-Core Tester,
 """
 
 from typing import Callable, Iterable, List, Optional, Tuple

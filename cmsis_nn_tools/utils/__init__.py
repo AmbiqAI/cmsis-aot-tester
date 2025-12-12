@@ -1,5 +1,5 @@
 """
-Utility functions for CMSIS-NN Tools.
+Utility functions for Helia-Core Tester.
 """
 
 from .command_runner import run_command

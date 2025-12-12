@@ -1,5 +1,5 @@
 """
-Command-line interface for CMSIS-NN Tools.
+Command-line interface for Helia-Core Tester.
 """
 
 import argparse
@@ -29,7 +29,7 @@ except Exception:  # noqa: BLE001 - broad to allow script-mode fallback
 def create_parser() -> argparse.ArgumentParser:
     """Create command-line argument parser."""
     parser = argparse.ArgumentParser(
-        description="CMSIS-NN Tools - Complete testing and simulation toolkit",
+        description="Helia-Core Tester - Complete testing and simulation toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

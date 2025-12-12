@@ -1,5 +1,5 @@
 """
-Quantize operation implementation for CMSIS-NN tester.
+Quantize operation implementation for Helia-Core Tester.
 
 Following the official CMSIS-NN test generator logic from RefactoredTestGen/Lib/op_quantize.py
 """

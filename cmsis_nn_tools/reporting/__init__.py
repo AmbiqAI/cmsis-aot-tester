@@ -1,5 +1,5 @@
 """
-Test reporting module for CMSIS-NN Tools.
+Test reporting module for Helia-Core Tester.
 
 This module provides comprehensive test reporting functionality including:
 - Test result data structures

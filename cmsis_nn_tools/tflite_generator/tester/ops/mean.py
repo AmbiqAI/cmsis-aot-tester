@@ -1,5 +1,5 @@
 """
-Mean operation implementation for CMSIS-NN tester.
+Mean operation implementation for Helia-Core Tester.
 """
 
 import numpy as np

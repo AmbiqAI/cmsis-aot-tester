@@ -653,7 +653,7 @@ def run_tests_with_reporting(cpus: List[str],
 
 
 def main(argv: List[str]) -> int:
-    ap = argparse.ArgumentParser(description="Build and run CMSIS-NN UnitTests on FVP Corstone-300 (Python).")
+    ap = argparse.ArgumentParser(description="Build and run helia-core kernels unit tests on FVP Corstone-300 (Python).")
     ap.add_argument("-c", "--cpu", default="cortex-m55", help="Comma-separated cores, e.g. cortex-m3,cortex-m55")
     ap.add_argument("-o", "--opt", default="-Ofast", help="Optimization level passed via CMSIS_OPTIMIZATION_LEVEL")
     ap.add_argument("--verbosity", type=int, choices=[0, 1, 2, 3], default=0,

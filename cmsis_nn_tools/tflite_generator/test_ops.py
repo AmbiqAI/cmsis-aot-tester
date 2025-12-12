@@ -1,5 +1,5 @@
 """
-Main TFLite model generation for CMSIS-NN tester.
+Main TFLite model generation for Helia-Core Tester.
 Thin generator that discovers YAML descriptors and generates TFLite models.
 """
 

@@ -1,5 +1,5 @@
 """
-Logging configuration for CMSIS-NN Tools.
+Logging configuration for Helia-Core Tester.
 """
 
 import logging
@@ -42,7 +42,7 @@ def setup_logger(
     verbosity: int = 0
 ) -> logging.Logger:
     """
-    Set up logger for CMSIS-NN Tools.
+    Set up logger for Helia-Core Tester.
     
     Args:
         name: Logger name

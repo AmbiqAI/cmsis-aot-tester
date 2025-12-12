@@ -1,5 +1,5 @@
 """
-ReLU6 operation implementation for CMSIS-NN tester.
+ReLU6 operation implementation for Helia-Core Tester.
 """
 
 from typing import Dict, Any
