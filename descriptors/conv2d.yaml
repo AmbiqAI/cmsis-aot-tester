@@ -422,12 +422,12 @@ hint:
 input_shape:
 - 1
 - 1
-- 128
-- 128
+- 1
+- 16
 filter_shape:
 - 3
 - 3
-- 128
+- 16
 - 1
 strides:
 - 4
